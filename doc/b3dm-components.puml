@@ -1,0 +1,229 @@
+@startuml B3DM Components
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam ArrowColor #555555
+skinparam ClassBorderColor #888888
+
+' ───────────────────────────────
+' 진입점 / 외부
+' ───────────────────────────────
+package "B3DMTest (뷰어)" #EEF6FF {
+    class Viewer3D {
+        - _b3dmDataSource : B3dmDataSource
+        - _fileServer : LocalFileServer
+        + LoadB3DM(filePath) : void
+        + ZoomFit() : void
+    }
+    class LocalFileServer {
+        + Port : int
+        + Start() : void
+        + Dispose() : void
+    }
+}
+
+' ───────────────────────────────
+' DataSource 레이어
+' ───────────────────────────────
+package "IO.DataSource" #FFF8EE {
+    class B3dmDataSource extends SceneDataSource {
+        - _b3dmTileSetBehaviour : CustomMultiTilesetBehaviour
+        - _tileObjects : ConcurrentDictionary<string, TileObject>
+        - _worldGlobe : WorldGlobe
+        + StartTile(url : string) : void
+        + CreateRenderableGroup() : RenderableGroup
+    }
+    abstract class SceneDataSource
+}
+
+' ───────────────────────────────
+' World 레이어
+' ───────────────────────────────
+package "IO.World" #EEFFEE {
+    class WorldGlobe <<Singleton>> {
+        - _chunker : WorldChunker
+        - _b3dmTileSetBehaviour : CustomMultiTilesetBehaviour
+        + Initialize(view, lat, lon, alt) : void
+        + OnUpdate(dataSource, callback) : void
+        + StartTile(url) : Task
+    }
+    class WorldChunker {
+        - m_TileChunker : TerrainTileChunker
+        + Initialize(context, lod) : void
+        + OnUpdate(callback) : void
+    }
+}
+
+' ───────────────────────────────
+' B3DM 핵심 레이어
+' ───────────────────────────────
+package "IO.B3DM" #FFF0F0 {
+
+    abstract class AbstractTilesetBehaviour {
+        + SceneOptions : TilesetSceneOptions
+        + ProcessingQueue : Queue<B3dmTile>
+        + RequestManager : RequestManager
+        + TileCache : B3dmTileCache
+        + {abstract} Ready() : bool
+        + {abstract} BoundingSphere() : OBB
+        + {abstract} OnUpdate(callback) : void
+    }
+
+    class CustomMultiTilesetBehaviour extends AbstractTilesetBehaviour {
+        - customTilesets : Dictionary<int, B3dmTileset>
+        + CullingDistance : float = 200000f
+        + MaximumScreenSpaceError : double = 1f
+        + Initialize(view, url, context) : void
+        + AddTileset(options) : bool
+        + OnUpdate(callback) : void
+        + ClearTiles() : void
+    }
+
+    class B3dmTileset {
+        + Root : B3dmTile
+        + Traversal : B3dmTilesetTraversal
+        + TileCache : B3dmTileCache
+        + Statistics : B3dmTilesetStatistics
+        + Ready : bool
+        + Update() : void
+        + GetRootTransform() : MatrixTransform
+        + {async} InitializeAsync(url) : void
+        + {async} LoadTilesetAsync(url) : Task<B3dmTile>
+    }
+
+    class B3dmTilesetTraversal {
+        - tileset : B3dmTileset
+        - sceneOptions : TilesetSceneOptions
+        + Run() : void
+        + DetermineFrustumSet() : bool
+        + RequestTile(tile) : void
+        + ToggleTiles(tile) : void
+    }
+
+    class B3dmTile {
+        + Tileset : B3dmTileset
+        + Parent : B3dmTile
+        + Children : List<B3dmTile>
+        + Content : B3dmTileContent
+        + ContentState : B3dmTileContentState
+        + FrameState : TileFrameState
+        + GeometricError : float
+        + BoundingVolume : B3dmTileBoundingVolume
+        + Process() : bool
+        + {async} RequestContentAsync() : UniTask
+        + UnloadContent() : void
+    }
+
+    class B3dmTileContent {
+        + Go : B3dmObject
+        + IsActive : bool
+        + Initialize(active) : void
+        + SetActive(active) : void
+        + Dispose() : void
+    }
+
+    class B3dmObject extends SceneObject {
+        + Name : string
+        + ActiveSelf : bool
+        + LocalPosition : Vector3d
+        + LocalRotation : Quaterniond
+        - _tileMesh : B3dmMesh
+        + BuildGeometry(material, textureMap) : bool
+        + SetTileMesh(mesh) : void
+        + SetActive(active) : void
+        + Render(ctx) : void
+    }
+
+    class B3dmMesh {
+        + Vertices : Vector3f[]
+        + Normals : Vector3f[]
+        + Triangles : int[]
+        + Uvs : Vector2f[]
+        + Center : Vec3LeftHandedGeocentric
+        + BoundingBox : AABB
+        + CreateGeometryPrimitive(material, textureMap) : GeometryPrimitive
+        + RecalculateNormals() : void
+    }
+
+    class B3DMLoader implements ILoader {
+        - loader : ILoader
+        + BatchTableJsonLength : uint
+        + LoadStream(url) : IEnumerator
+        + {async} LoadStreamUniTask(url) : UniTask
+    }
+
+    class B3dmObjectManager <<Singleton>> {
+        + {static} Instantiate(obj, pos, rot, parent) : B3dmObject
+        + {static} Destroy(obj) : void
+        + {static} Find(name) : B3dmObject
+    }
+
+    ' B3dmTilesetSchemaExtensions (static)
+    class B3dmTilesetSchemaExtensions <<static>> {
+        + {static} HasTransform(tile) : bool
+        + {static} GetTransform(tile) : MatrixTransform
+        + {static} IsDefined(volume) : bool
+    }
+}
+
+' ───────────────────────────────
+' View / Render 레이어
+' ───────────────────────────────
+package "View.Groups" #F0F0FF {
+    class B3mdRenderGroup extends RenderableGroup {
+        - _dataSource : B3dmDataSource
+        - _currentObjects : List<TileObject>
+        + PreRender(ctx) : void
+        + Render(ctx) : void
+    }
+    abstract class RenderableGroup
+}
+
+' ───────────────────────────────
+' 관계 정의
+' ───────────────────────────────
+
+' 뷰어 → DataSource
+Viewer3D --> B3dmDataSource : creates
+Viewer3D --> LocalFileServer : creates
+Viewer3D --> WorldGlobe : Initialize()
+
+' DataSource 관계
+B3dmDataSource --> WorldGlobe : uses
+B3dmDataSource --> CustomMultiTilesetBehaviour : owns
+B3dmDataSource ..> B3mdRenderGroup : CreateRenderableGroup()
+
+' WorldGlobe
+WorldGlobe --> WorldChunker : owns
+WorldGlobe --> CustomMultiTilesetBehaviour : owns
+
+' Behaviour → Tileset
+CustomMultiTilesetBehaviour "1" --> "0..*" B3dmTileset : manages
+
+' Tileset 내부
+B3dmTileset --> B3dmTile : Root
+B3dmTileset --> B3dmTilesetTraversal : Traversal
+B3dmTilesetTraversal --> B3dmTileset : ref
+
+' Tile 트리
+B3dmTile "1" --> "0..*" B3dmTile : Children
+B3dmTile --> B3dmTileContent : Content
+
+' Content → Object → Mesh
+B3dmTileContent --> B3dmObject : Go
+B3dmObject --> B3dmMesh : _tileMesh
+
+' Loader
+B3DMLoader ..> B3dmObject : produces (via GLB)
+
+' Schema 확장
+B3dmTilesetSchemaExtensions ..> B3dmTileset : extends Schema.Tile
+
+' RenderGroup
+B3mdRenderGroup --> B3dmDataSource : ref
+
+' ObjectManager
+B3dmObjectManager ..> B3dmObject : manages lifecycle
+
+@enduml

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -21,8 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\MapPrimeNet\src\MapPrimeNet\A4L.Mapprime3DNet\A4L.Mapprime3DNet.csproj" />
-    <ProjectReference Include="..\..\MapPrimeNet\src\MapPrimeNet\A4L.MP3DCore\A4L.MP3DCore.csproj" />
+    <ProjectReference Include="..\..\MapPrimeNetV2\src\A4L.Mapprime3DNet\A4L.Mapprime3DNet.csproj" />
+    <ProjectReference Include="..\..\MapPrimeNetV2\src\A4L.MP3DCore\A4L.MP3DCore.csproj" />
   </ItemGroup>
 
 </Project>

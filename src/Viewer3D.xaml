@@ -15,7 +15,7 @@
 
         <!-- 툴바 -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Background="#FF2D2D30" VerticalAlignment="Center" Margin="4,0">
-            <Button x:Name="btnOpen" Content="파일 열기 (.b3dm)" Margin="4,0" Padding="8,4"
+            <Button x:Name="btnOpen" Content="파일 열기 (tileset.json)" Margin="4,0" Padding="8,4"
                     Click="btnOpen_Click"/>
         </StackPanel>
 

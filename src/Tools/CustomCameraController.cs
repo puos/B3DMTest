@@ -1,12 +1,9 @@
-using A4L.Mapprime3DNet.View;
-using A4L.MP3DCore.Common.Base;
-using A4L.MP3DCore.Common.DebugUtils;
 using A4L.MP3DCore.Common.Math;
-using A4L.MP3DCore.Common.Util;
 using A4L.MP3DCore.Platform;
 using A4L.MP3DCore.Scene.Animator;
 using A4L.MP3DCore.Scene.Animator.CameraAnimator;
 using A4L.MP3DCore.Scene.Camera;
+using A4L.MP3DCore.Scene.InputHandler;
 using A4L.MP3DCore.Scene.Renderer;
 using A4L.MP3DCore.Scene.SceneGraph.Factory;
 using A4L.MP3DCore.Scene.SceneGraph.Object;
@@ -461,7 +458,7 @@ public class CustomCameraController : InputHandlerBase
     {
         ip = null; outNormal = null;
         PickedIntersections infos = null;
-        GetPickPoints(ray, context, false, null, out infos);
+        GetPickPoints(ray, context, false,  out infos);
         infos.Intersections.RemoveAll(x => x.PickType == PickedIntersection.PickedTypes.Plane);
 
         if (infos.Count <= 0)
@@ -494,7 +491,7 @@ public class CustomCameraController : InputHandlerBase
     {
         ip = null; outNormal = null;
         PickedIntersections infos = null;
-        var hasPick = GetPickPoints(ray, context, false, null, out infos);
+        var hasPick = GetPickPoints(ray, context, false,  out infos);
 
         if (hasPick && infos != null)
         {

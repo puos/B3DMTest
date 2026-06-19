@@ -1,0 +1,301 @@
+@startuml class_Unity3DTile_corrected
+' ============================================================
+'  Unity3DTile 클래스 다이어그램 (실제 코드 기준 보정본)
+'  - CustomMultiTilesetBehaviour / CustomTilesetBehaviour 추가
+'  - 누락 멤버/관계 보강
+'  기준 경로: Assets/Support/Unity3DTile/Scripts
+' ============================================================
+
+title Unity3DTile — Class Diagram (코드 기준 보정본)
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #fffdf0
+  BorderColor #b8860b
+  ArrowColor #6b7280
+}
+skinparam class<<unity>> {
+  BackgroundColor #eef2ff
+  BorderColor #4f46e5
+}
+skinparam class<<ext>> {
+  BackgroundColor #ecfdf5
+  BorderColor #059669
+}
+
+' ===================== Behaviour 계층 =====================
+abstract class AbstractTilesetBehaviour <<MonoBehaviour>> {
+  +SceneOptions : Unity3DTilesetSceneOptions
+  +Stats : Unity3DTilesetStatistics
+  +RequestManager : RequestManager <<get>>
+  +TileCache : TileCache <<get>>
+  +ProcessingQueue : Queue<Unity3DTile>
+  --
+  +Start()
+  +ProcessTileset()
+  +RequestUnloadUnusedAssets()
+  +{abstract} Ready() : bool
+  +{abstract} BoundingSphere() : BoundingSphere
+  +{abstract} DeepestDepth() : int
+  +{abstract} ClearForcedTiles()
+  #_start()
+  #_lateUpdate()
+  #UpdateStats()
+}
+
+class CustomMultiTilesetBehaviour {
+  -rootUrl : string
+  -tIdx : TileIndex
+  -worldContext : NeoWorldContext
+  -schemaTileset : Schema.Tileset
+  -customTilesets : Dictionary<int, Unity3DTileset>
+  -group : CullingGroup
+  +tilesetCount : int
+  +MaxConcurrentRequests : int
+  --
+  +Initialize(tIdx, rootUrl, worldContext)
+  +LoadTilesetJson(url) : Promise<string>
+  +AddTileset(options) : bool
+  +TilesetComplete(tileset) : bool
+  +ShowTilesets(bShow)
+  +UpdateWorldOrigin(newOrigin)
+  +LateUpdate()
+  -StateChangedMethod(evt)
+  -CreateCullingGroup(volume, m)
+  #_lateUpdate()
+}
+
+class MultiTilesetBehaviour {
+  +TilesetOptions : List<Unity3DTilesetOptions>
+  -tilesets : List<Unity3DTileset>
+  -nameToTileset : Dictionary<string, Unity3DTileset>
+  --
+  +AddTileset(options) : bool
+  +RemoveTileset(name) : Unity3DTileset
+  +GetTileset(name) : Unity3DTileset
+  +ShowTilesets(names) / HideTilesets(names)
+  +AddScene(scene, optsJson)
+}
+
+class GenericWebMultiTilesetBehaviour {
+  ' Examples: 인덱스 URL을 받아 AddTileset 호출
+}
+
+class TilesetBehaviour {
+  +TilesetOptions : Unity3DTilesetOptions
+  +Tileset : Unity3DTileset
+  --
+  +MakeTileset()
+}
+
+class CustomTilesetBehaviour {
+  -isInitialize : bool
+  --
+  +Initialize(options)
+  +UpdateWorldOrigin(newOrigin)
+  -UpdateTile(tile)
+}
+
+AbstractTilesetBehaviour <|-- CustomMultiTilesetBehaviour
+AbstractTilesetBehaviour <|-- MultiTilesetBehaviour
+AbstractTilesetBehaviour <|-- TilesetBehaviour
+MultiTilesetBehaviour   <|-- GenericWebMultiTilesetBehaviour
+TilesetBehaviour        <|-- CustomTilesetBehaviour
+
+' ===================== 핵심 런타임 객체 =====================
+class Unity3DTileset {
+  +TilesetOptions : Unity3DTilesetOptions <<get>>
+  +Root : Unity3DTile <<get>>
+  +TileCache : TileCache <<get>>
+  +RequestManager : RequestManager <<get>>
+  +ProcessingQueue : Queue<Unity3DTile> <<get>>
+  +Behaviour : AbstractTilesetBehaviour <<get>>
+  +Traversal : Unity3DTilesetTraversal <<get>>
+  +DeepestDepth : int <<get>>
+  +Ready : bool <<get>>
+  --
+  +Update()
+  +LoadTilesetJson(url) : Promise<string>
+  +LoadTileJson(url, action) : Coroutine
+  +UpdateStats()
+}
+
+class Unity3DTile {
+  +Tileset : Unity3DTileset
+  +Parent : Unity3DTile
+  +Children : List<Unity3DTile>
+  +Depth : int
+  +Id : string <<get>>
+  +schemaTile : Schema.Tile
+  +BoundingVolume : Unity3DTileBoundingVolume
+  +FrameState : Unity3DTileFrameState
+  --
+  +RequestContent(priority)
+  +Process() : bool
+  +UpdateWorldOrigin()
+}
+
+class Unity3DTilesetTraversal {
+  +ForceTiles : HashSet<Unity3DTile>
+  --
+  +Run()
+  -DetermineFrustumSet(...)
+  -SkipTraversal(tile)
+  -ToggleTiles(tile)
+  -RequestTile(tile)
+}
+
+class RequestManager {
+  --
+  +EnqueRequest(request)
+  +Process(maxNewRequests)
+  +Count() : int
+  +ForEachQueuedDownload(a) / ForEachActiveDownload(a)
+}
+
+class Request {
+  +Tile : Unity3DTile
+  +Started : Promise
+  +Finished : Promise<bool>
+}
+
+class Unity3DTilesetOptions {
+  +Name : string
+  +Url : string
+  +MaximumScreenSpaceError : double
+  +Show : bool
+  +ShadowCastingMode / RecieveShadows
+}
+
+class TileCache {
+  +MaxSize / TargetSize : int
+  +MarkAllUnused()
+  +UnloadUnusedContent(n)
+}
+
+class Unity3DTileFrameState {
+  +Priority : float
+  +LastVisitedFrame : int
+  +IsUsedThisFrame : bool
+}
+
+class Unity3DTileInfo <<MonoBehaviour>> {
+  +FrameState : Unity3DTileFrameState
+  +Tile : Unity3DTile
+}
+
+' ===================== 콘텐츠 로딩 파이프라인 =====================
+class B3DMComponent <<MonoBehaviour>> {
+  +Url : string
+  +Multithreaded : bool
+  +ShaderOverride : Shader
+  --
+  +Download(loadComplete) : IEnumerator
+  +Instantiate(importer) : bool
+  +InstantiateScene(importer, idx)
+}
+
+class B3DMLoader {
+  +BATCH_LENGTH : int
+  +LoadedStream : Stream
+  --
+  +LoadStream(relativePath) : IEnumerator
+}
+
+class GltfImport <<ext>> {
+  ' GLTFast: glb/gltf 파싱 + 인스턴스화
+}
+
+' ===================== 스키마 / 외부 =====================
+class "Schema.Tileset" as SchemaTileset {
+  +Root : Schema.Tile
+  +Asset : Schema.Asset
+  --
+  +{static} FromJson(json) : Tileset
+}
+
+abstract class Unity3DTileBoundingVolume {
+  +{abstract} BoundingSphere()
+  +{abstract} Contains(p)
+  +{abstract} IntersectPlane(plane)
+}
+
+class NeoWorldContext <<ext>> {
+  +WorldOrigin : Vec3LeftHandedGeocentric
+  +WorldOriginChanged : Event
+}
+
+class CullingGroup <<unity>> {
+  +onStateChanged
+  +SetBoundingSpheres()
+}
+
+class CustomMultiTilesetGenerator <<MonoBehaviour>> {
+  +multisets : MultiTilesetInfo[]
+  --
+  +ForcedClearTile()
+}
+
+' ===================== 관계 =====================
+' base가 소유
+AbstractTilesetBehaviour *--> "1" RequestManager
+AbstractTilesetBehaviour *--> "1" TileCache
+AbstractTilesetBehaviour o--> "*" Unity3DTile : ProcessingQueue
+
+' 각 behaviour가 tileset 소유
+CustomMultiTilesetBehaviour *--> "*" Unity3DTileset : customTilesets
+CustomMultiTilesetBehaviour ..> SchemaTileset : FromJson
+CustomMultiTilesetBehaviour --> NeoWorldContext
+CustomMultiTilesetBehaviour ..> CullingGroup
+MultiTilesetBehaviour       *--> "*" Unity3DTileset : tilesets
+TilesetBehaviour            --> "1" Unity3DTileset : Tileset
+
+' 생성/구동
+CustomMultiTilesetGenerator ..> CustomMultiTilesetBehaviour : <<create>> + Initialize()
+
+' tileset 내부 구성
+Unity3DTileset *--> "1" Unity3DTile : Root
+Unity3DTileset --> Unity3DTilesetTraversal : Traversal
+Unity3DTileset --> RequestManager
+Unity3DTileset --> TileCache
+Unity3DTileset --> Unity3DTilesetOptions
+Unity3DTileset ..> SchemaTileset
+Unity3DTileset --> AbstractTilesetBehaviour : Behaviour
+
+' 타일 트리
+Unity3DTile "1" *--> "0..*" Unity3DTile : Children
+Unity3DTile --> "1" Unity3DTileBoundingVolume
+Unity3DTile --> Unity3DTileFrameState
+Unity3DTile ..> RequestManager : EnqueRequest
+Unity3DTile ..> B3DMComponent : <<create>> RequestContent()
+Unity3DTileInfo --> Unity3DTile
+
+' traversal
+Unity3DTilesetTraversal --> Unity3DTileset
+Unity3DTilesetTraversal ..> Unity3DTile : RequestTile / ToggleTiles
+
+' request
+RequestManager o--> "*" Request
+Request --> Unity3DTile
+
+' 콘텐츠 로딩
+B3DMComponent ..> B3DMLoader
+B3DMComponent ..> GltfImport
+B3DMLoader ..> GltfImport
+
+note bottom of B3DMComponent
+  원본 다이어그램의 "CustomTileComponent"는
+  현재 코드에 없음.
+  실제 인스턴스화는 GltfImport(GLTFast) +
+  GameObjectInstantiator가 담당.
+end note
+
+note right of CustomMultiTilesetBehaviour
+  프로젝트가 실제 사용하는 진입 클래스.
+  원본 다이어그램엔 누락돼 있었음
+  (MultiTilesetBehaviour 자리에 위치).
+end note
+
+@enduml

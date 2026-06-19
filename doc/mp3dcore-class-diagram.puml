@@ -1,0 +1,333 @@
+@startuml A4L.MP3DCore Class Diagram
+
+title A4L.MP3DCore — 핵심 클래스 다이어그램 (B3DMTest 사용 중심)
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam ArrowColor #555555
+skinparam ClassBorderColor #888888
+skinparam packageStyle rectangle
+
+' ============================================================
+' View 레이어  (A4L.Mapprime3DNet.View)
+' ============================================================
+package "A4L.Mapprime3DNet.View" #EEF6FF {
+
+    class ObjectsViewWPF {
+        + ViewController : ViewController
+        + SceneView : SceneView
+        + BackFaceCulling : bool
+        + RenderContextType : RenderContextTypes
+        + SetController(vc : ViewController) : void
+        + Clear() : void
+    }
+
+    abstract class ViewControllerBase
+
+    class ViewController extends ViewControllerBase {
+        + Visualizer : RenderableGroup
+        + BoundingBox : AABB
+        + MouseMode : MouseModes
+        + View : ViewPort
+        + BackgroundColor : ColorF
+        + PolygonMode : PolygonModes
+        + SetSceneView(sv : SceneView) : void
+        + FitTopView(bb : AABB) : void
+    }
+}
+
+' ============================================================
+' Scene 레이어  (A4L.MP3DCore.Scene)
+' ============================================================
+package "A4L.MP3DCore.Scene" #EEFFEE {
+
+    class SceneView <<IRenderTarget>> {
+        + InputHandlers : InputHandlers
+        + SceneGroups : RenderableGroups
+        + RenderableGroups : RenderableGroups
+        + View : ViewPort
+        + NearFarUpdater : NearFarUpdater
+        + Renderer : BatchRenderer
+        + BoundingBox : AABB
+        + ShowDebugFPS : bool
+        + RenderAbort : Func<RenderStatistics,double,bool>
+        + InitOpenGL(w, h) : void
+        + Render(g, mousePos) : void
+        + Resize(w, h) : void
+    }
+}
+
+' ============================================================
+' Camera 레이어  (A4L.MP3DCore.Scene.Camera)
+' ============================================================
+package "A4L.MP3DCore.Scene.Camera" #FFF8EE {
+
+    class ViewPort {
+        + Camera : Camera
+        + FovY : double
+        + Near : double
+        + Far : double
+        + Aspect : double
+        + ProjMatrix : Matrix4d
+        + Frustum : Frustum
+        + Perspective : bool
+        + Resize(w, h) : void
+        + GetRayFromScreenCoord(x, y) : Ray
+        + Update(rc : RenderContext) : void
+    }
+
+    class Camera {
+        + Distance : double
+        + LookAt : Vector3d
+        + Quat : Quaterniond
+        + Position : Vector3d
+        + Forward : Vector3d
+        + ViewMatrix : Matrix4d
+        + GetEye() : Vector3d
+        + RotateByZAxis(deg) : void
+        + RotateByRight(deg) : void
+        + RotateByUp(deg) : void
+        + CalcViewMatrix() : Matrix4d
+    }
+
+    class NearFarUpdater {
+        + NearUpdateEnable : bool
+        + FarUpdateEnable : bool
+        + TargetNear : double
+        + TargetFar : double
+        + View : ViewPort
+        + Update(ctx : RenderContext) : void
+    }
+}
+
+' ============================================================
+' InputHandler 레이어
+' ============================================================
+package "A4L.MP3DCore.Scene.InputHandler" #FFF0F0 {
+
+    class InputHandlers <<Disposable>> {
+        + Add(h : InputHandlerBase) : void
+        + Remove(h : InputHandlerBase) : void
+        + SetViewingMode(h : InputHandlerBase) : void
+        + AddHudHandler(h : HUDInputHandlerBase) : void
+        + OnMouseDown/Move/Up(e, ctx) : void
+        + OnKeyDown/Up(e, ctx) : void
+        + OnTimer(e, ctx) : void
+    }
+
+    class InputHandlerBase <<Disposable, IRenderable>> {
+        + ID : int
+        + Enabled : bool
+        + OnMouseDown/Move/Up(e, ctx) : void
+        + OnMouseWheel(e, ctx) : void
+        + OnKeyDown/Up(e, ctx) : void
+        + PreRender(rc) : void
+        + Render(ctx) : void
+        + GetPickPoints(...) : bool
+    }
+
+    class CustomCameraController extends InputHandlerBase {
+        + Keys : KeySet
+        + Operations : Operation
+        + ZoomMinDistance : double
+        + ZoomMaxDistance : double
+        + RotationEnabled : bool
+        + CustomSpeed : double
+        + PanningDistancePerPixel : double
+        - onRotationDrag(e, ctx) : void
+        - onPanningDrag(e, ctx) : void
+        - zoom(e, ctx) : void
+        + PreRender(rc) : void
+        + Render(ctx) : void
+    }
+
+    abstract class HUDInputHandlerBase extends InputHandlerBase {
+        + Visible : bool
+        + SetDock(pos : DockingPositions) : void
+    }
+
+    class HUD3AxisInputHandler extends HUDInputHandlerBase {
+        + HUD3AxisInputHandler(name, pixelSize)
+    }
+}
+
+' ============================================================
+' Renderer 레이어
+' ============================================================
+package "A4L.MP3DCore.Scene.Renderer" #F0F0FF {
+
+    class RenderContext {
+        + Context : GLContext
+        + Renderer : BatchRenderer
+        + View : ViewPort
+        + RenderState : RenderState
+        + RenderStatistics : RenderStatistics
+        + Eye : Vector3d
+        + ViewVector : Vector3d
+        + ViewProjMatrix : Matrix4d
+        + ApplyCulling : bool
+    }
+
+    class BatchRenderer {
+        + Render(ctx : RenderContext) : void
+    }
+
+    class ColorF {
+        + R : float
+        + G : float
+        + B : float
+        + A : float
+        + Set(r, g, b, a) : void
+        + GetColor() : Color
+    }
+}
+
+' ============================================================
+' SceneGraph 레이어
+' ============================================================
+package "A4L.MP3DCore.Scene.SceneGraph" #FFFEF0 {
+
+    class RenderableGroups {
+        + Add(g : RenderableGroup) : void
+        + Clear() : void
+    }
+
+    class RenderableGroup <<IRenderable, IBoundable, IPickable>> {
+        + LayerType : Types
+        + Name : string
+        + Visible : bool
+        + NearDistance : double
+        + FarDistance : double
+        + BoundingBox : AABB
+        + Render(ctx : RenderContext) : void
+        + PreRender(ctx : RenderContext) : void
+    }
+
+    class GeometryPrimitive {
+        + Vertices : float[]
+        + Indices : ushort[]
+        + Normals : float[]
+        + TexCoords : float[]
+        + DrawCommand : DrawCommands
+        + UpdateVBO(ctx) : void
+        + Render(ctx) : void
+    }
+}
+
+' ============================================================
+' Math 레이어  (A4L.MP3DCore.Common.Math)
+' ============================================================
+package "A4L.MP3DCore.Common.Math" #F5F5F5 {
+    class Vector3d {
+        + X : double
+        + Y : double
+        + Z : double
+        + Dot(o) : double
+        + Cross(o) : Vector3d
+        + GetNormalized() : Vector3d
+    }
+    class Quaterniond {
+        + X : double
+        + Y : double
+        + Z : double
+        + W : double
+        + {static} IDENTITY : Quaterniond
+        + ToEular() : Vector3d
+    }
+    class Matrix4d {
+        + M : double[,]
+        + SetIdentity() : void
+        + SetTranslation(pos) : void
+        + Transform(v) : Vector3d
+    }
+    class AABB {
+        + MaxLength : double
+        + Radius : double
+        + GetCenter() : Vector3d
+        + Update(p : Vector3d) : void
+    }
+    class OBB
+}
+
+' ============================================================
+' Common / Workspace 레이어  (A4L.Mapprime3DNet.Common)
+' ============================================================
+package "A4L.Mapprime3DNet.Common" #EEEEFF {
+
+    class GlobalOption <<static>> {
+        + {static} BackgroundColor : ColorF
+        + {static} Near : double
+        + {static} Far : double
+        + {static} ViewAxisPixelSize : int
+        + {static} FieldOfView : double
+    }
+
+    class CommandUI {
+        + CommandUI(ctrl, vc)
+        + RefreshSceneGroup() : void
+        + SetDefaultMouseMode() : void
+        + ZoomFit() : void
+    }
+
+    class Workspace <<Singleton>> {
+        + {static} Instance : Workspace
+        + Owner : Window
+        + ViewControl : ObjectsViewWPF
+        + ViewController : ViewController
+        + CommandUi : CommandUI
+        + DataSources : ObservableCollection<SceneDataSource>
+        + BoundingBox : AABB
+    }
+}
+
+' ============================================================
+' 관계 정의
+' ============================================================
+
+' View
+ObjectsViewWPF --> ViewController : ViewController
+ObjectsViewWPF --> SceneView : SceneView
+ViewController --> ViewPort : View
+ViewController --> ColorF : BackgroundColor
+
+' SceneView
+SceneView --> InputHandlers : InputHandlers
+SceneView --> RenderableGroups : SceneGroups
+SceneView --> ViewPort : View
+SceneView --> NearFarUpdater : NearFarUpdater
+SceneView --> BatchRenderer : Renderer
+
+' Camera
+ViewPort --> Camera : Camera
+ViewPort --> Matrix4d : ProjMatrix
+Camera --> Vector3d : LookAt
+Camera --> Quaterniond : Quat
+NearFarUpdater --> ViewPort : View
+
+' InputHandler
+InputHandlers "1" o--> "0..*" InputHandlerBase : manages
+SceneView ..> CustomCameraController : Viewing mode
+SceneView ..> HUD3AxisInputHandler : HUD
+
+' Renderer
+RenderContext --> BatchRenderer : Renderer
+RenderContext --> ViewPort : View
+BatchRenderer ..> RenderableGroup : renders
+
+' SceneGraph
+RenderableGroups "1" o--> "0..*" RenderableGroup
+RenderableGroup --> AABB : BoundingBox
+RenderableGroup ..> GeometryPrimitive : draws
+
+' Workspace
+Workspace --> ObjectsViewWPF : ViewControl
+Workspace --> ViewController : ViewController
+Workspace --> CommandUI : CommandUi
+Workspace --> AABB : BoundingBox
+CommandUI --> ObjectsViewWPF
+CommandUI --> ViewController
+
+' GlobalOption
+GlobalOption --> ColorF : BackgroundColor
+
+@enduml

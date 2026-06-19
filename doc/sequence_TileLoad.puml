@@ -1,0 +1,130 @@
+@startuml sequence_TileLoad
+' ============================================================
+'  3D Tiles 로딩 시퀀스 (코드 기준)
+'  시작 → 루트 tileset 로드 → 타일셋/타일 트리 구성
+'  → 매 프레임 트래버설 → 콘텐츠 다운로드 → Unity GameObject 생성
+'  기준: CustomMultiTilesetBehaviour 흐름
+' ============================================================
+
+title 3D Tiles Load Sequence — start → load → read tileset → create GameObject
+
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 12
+skinparam BoxPadding 10
+
+actor "Generator\n(CustomMultiTilesetGenerator)" as Gen
+participant "CustomMultiTilesetBehaviour" as CMTB
+participant "CustomUtil /\nWebRequestLoader" as Net
+boundary "Tile Server (HTTP)" as Server
+participant "Schema.Tileset" as Schema
+participant "Unity3DTileset" as TS
+participant "Unity3DTilesetTraversal" as Trav
+participant "Unity3DTile" as Tile
+participant "RequestManager" as RM
+participant "B3DMComponent" as B3DM
+participant "B3DMLoader" as Loader
+participant "GltfImport\n(GLTFast)" as Gltf
+participant "TileCache" as Cache
+entity "Unity GameObject" as GO
+
+== ① 시작 / 초기화 ==
+Gen -> CMTB : AddComponent + Initialize(tIdx, rootUrl, worldContext)
+activate CMTB
+CMTB -> CMTB : URL 정규화 (data:// → http)
+
+== ② 루트 tileset.json 로드 & 파싱 ==
+CMTB -> Net : LoadTilesetJson(url)\n→ DownloadTileJson()
+activate Net
+Net -> Server : UnityWebRequest GET tileset.json
+Server --> Net : JSON
+Net --> CMTB : Promise.Resolve(json)
+deactivate Net
+CMTB -> Schema : Tileset.FromJson(json)
+Schema --> CMTB : schemaTileset (Root.Children)
+
+== ③ 자식 타일셋 생성 (child 마다) ==
+loop schemaTileset.Root.Children
+  CMTB -> CMTB : AddTileset(options)
+  CMTB -> TS : new Unity3DTileset(options, this)
+  activate TS
+  TS -> Net : LoadTilesetJson(tilesetUrl)
+  activate Net
+  Net -> Server : GET (sub) tileset.json
+  Server --> Net : JSON
+  Net --> TS : Promise.Resolve(json)
+  deactivate Net
+  TS -> Schema : Tileset.FromJson(json)
+  Schema --> TS : schemaTileset
+  TS -> TS : LoadTileset() — Unity3DTile 트리 구성
+  TS -> Tile : new Unity3DTile(root/children)
+  TS --> CMTB : Root 설정 → TilesetComplete(this)
+  deactivate TS
+end
+CMTB -> CMTB : (모든 child 완료 시)\nWorldOriginChanged 구독
+deactivate CMTB
+
+== ④ 매 프레임 트래버설 (LOD/가시성 판정) ==
+CMTB -> CMTB : LateUpdate() → ProcessTileset()
+activate CMTB
+CMTB -> TS : _lateUpdate() → Update()
+TS -> Trav : Run()
+activate Trav
+Trav -> Trav : DetermineFrustumSet / SkipTraversal / ToggleTiles
+Trav -> Tile : RequestTile() → RequestContent(priority)
+activate Tile
+Tile -> RM : EnqueRequest(Request{started, finished})
+deactivate Tile
+deactivate Trav
+
+== ⑤ 다운로드 시작 + 빈 GameObject 생성 ==
+CMTB -> RM : Process(maxNewRequests)
+activate RM
+RM -> Tile : started.Resolve()   (다운로드 슬롯 확보)
+activate Tile
+note over Tile,GO #fdf6e3
+  ContentType == B3DM 일 때
+end note
+Tile -> GO : new GameObject(Id)\n(부모=Behaviour, Transform 설정)
+activate GO
+Tile -> GO : AddComponent<Unity3DTileInfo>
+Tile -> GO : AddComponent<B3DMComponent> (Url 지정)
+Tile -> B3DM : StartCoroutine(Download(finished))
+deactivate Tile
+deactivate RM
+
+== ⑥ 콘텐츠 로딩 → 메시 인스턴스화 ==
+activate B3DM
+B3DM -> Loader : new B3DMLoader + LoadStream(url)
+activate Loader
+Loader -> Server : UnityWebRequest GET *.b3dm
+Server --> Loader : bytes (glb stream)
+Loader --> B3DM : LoadedStream
+deactivate Loader
+B3DM -> Gltf : new GltfImport().Load(stream)
+activate Gltf
+Gltf --> B3DM : glTF 파싱 완료
+B3DM -> Gltf : InstantiateScene(importer)
+Gltf -> GO : Mesh/Material/자식 오브젝트 생성
+deactivate Gltf
+B3DM --> Tile : finished.Resolve(true)
+deactivate B3DM
+
+== ⑦ 후처리 → READY ==
+Tile -> Cache : TileCache.Add(this)
+Tile -> CMTB : ProcessingQueue.Enqueue(this)
+CMTB -> Tile : (다음 ProcessTileset) Process()
+activate Tile
+Tile -> GO : Content.Initialize(colliders) / Shadow 설정
+Tile -> Tile : ContentState = READY
+deactivate Tile
+deactivate GO
+deactivate CMTB
+
+note right of GO
+  타일은 카메라 거리/가시성에 따라
+  ShowTilesets() 로 표시/숨김,
+  캐시 초과 시 UnloadUnusedContent 로 해제
+end note
+
+@enduml

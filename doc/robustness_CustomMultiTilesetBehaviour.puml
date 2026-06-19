@@ -1,0 +1,87 @@
+@startuml robustness_CustomMultiTilesetBehaviour
+' ICONIX Robustness Diagram - CustomMultiTilesetBehaviour
+' Actor -> Boundary -> Control -> Entity (3D Tiles 다중 타일셋 로딩/표시)
+
+title Robustness Diagram — CustomMultiTilesetBehaviour
+
+left to right direction
+skinparam shadowing false
+skinparam ranksep 90
+skinparam nodesep 45
+skinparam ArrowColor #94a3b8
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam boundary {
+  BackgroundColor #eff6ff
+  BorderColor #2563eb
+}
+skinparam control {
+  BackgroundColor #fff7ed
+  BorderColor #d97706
+}
+skinparam entity {
+  BackgroundColor #ecfdf5
+  BorderColor #059669
+}
+
+' ===== Actors =====
+actor "개발자\n(Inspector 설정)" as Dev
+actor "Main Camera\n(시야/거리)" as Cam
+
+' ===== Boundary =====
+boundary "Unity Inspector\n(rootUrl · tIdx · debugDraw)" as Insp
+boundary "Tile Server (HTTP)\ntileset.json · b3dm · pnts\nvia CustomUtil/WebRequestLoader" as Server
+boundary "CullingGroup\n(가시성 컬링)" as Cull
+
+' ===== Control (CustomMultiTilesetBehaviour 메서드) =====
+package "CustomMultiTilesetBehaviour : AbstractTilesetBehaviour" {
+  control "Initialize()" as Init
+  control "LoadTilesetJson()\nDownloadTileJson" as Load
+  control "AddTileset()" as Add
+  control "ProcessTileset()\nLateUpdate / _lateUpdate" as Proc
+  control "StateChangedMethod()\n→ ShowTilesets()" as State
+  control "TilesetComplete()" as Complete
+  control "UpdateWorldOrigin()" as UpdOrigin
+}
+
+' ===== Entity =====
+entity "Schema.Tileset\nFromJson(json)" as Schema
+entity "Unity3DTilesetOptions" as Opts
+entity "Unity3DTileset\n(+ Unity3DTile 트리)" as TS
+entity "customTilesets\nDictionary<int, Unity3DTileset>" as Dict
+entity "TileCache · RequestManager\nProcessingQueue (base)" as Cache
+entity "NeoWorldContext\nWorldOrigin · WorldOriginChanged" as Ctx
+
+' ===== Flow =====
+' actor -> boundary
+Dev --> Insp : 설정
+Cam --> Cull : 위치/시야
+
+' boundary -> control
+Insp --> Init : 초기화
+Cull --> State : onStateChanged
+
+' control -> control
+Init --> Load
+Init --> Add : 자식 타일셋마다
+
+' control -> boundary (다운로드)
+Load --> Server : tileset.json GET
+Proc --> Server : 타일 콘텐츠 GET
+Init --> Cull : CreateCullingGroup
+
+' control -> entity
+Init --> Schema : 파싱
+Add --> Opts : 생성
+Add --> TS : new Unity3DTileset
+Add --> Dict : 등록
+State --> Dict : Show 토글
+Proc --> Cache : 요청/캐시 관리
+Complete --> Ctx : WorldOriginChanged 구독
+UpdOrigin --> Dict : 좌표 갱신
+
+' entity -> control (콜백/이벤트)
+TS --> Complete : 로드 완료 콜백
+Ctx --> UpdOrigin : 원점 변경 이벤트
+
+@enduml

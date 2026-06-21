@@ -1,0 +1,152 @@
+<svg viewBox="0 0 900 620" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <style>
+    text { font-family: 'Segoe UI', Arial, sans-serif; }
+    .obj-box { fill: #EEF3FB; stroke: #4A6FA5; stroke-width: 2; rx: 6; ry: 6; }
+    .obj-text { font-size: 11px; font-weight: bold; fill: #1a3a6a; text-anchor: middle; }
+    .obj-sub { font-size: 9px; fill: #557; text-anchor: middle; }
+    .msg-g { font-size: 9px; fill: #1a6a1a; font-weight: bold; }
+    .msg-r { font-size: 9px; fill: #8B0000; font-weight: bold; }
+    .msg-b { font-size: 9px; fill: #1a1a8a; font-weight: bold; }
+  </style>
+  <marker id="arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#1a6a1a"/>
+  </marker>
+  <marker id="arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#8B0000"/>
+  </marker>
+  <marker id="arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0 0,8 3,0 6" fill="#1a1a8a"/>
+  </marker>
+</defs>
+
+<rect width="900" height="620" fill="white"/>
+
+<!-- ── Objects ── -->
+<!-- Viewer3D -->
+<rect x="20" y="30" width="140" height="44" rx="6" class="obj-box"/>
+<text x="90" y="50" class="obj-text">Viewer3D</text>
+<text x="90" y="65" class="obj-sub">진입점</text>
+
+<!-- B3dmDataSource -->
+<rect x="220" y="30" width="160" height="44" rx="6" class="obj-box"/>
+<text x="300" y="50" class="obj-text">B3dmDataSource</text>
+<text x="300" y="65" class="obj-sub">IO.DataSource</text>
+
+<!-- WorldGlobe -->
+<rect x="460" y="30" width="140" height="44" rx="6" class="obj-box"/>
+<text x="530" y="50" class="obj-text">WorldGlobe</text>
+<text x="530" y="65" class="obj-sub">«Singleton»</text>
+
+<!-- CustomMultiTilesetBehaviour -->
+<rect x="200" y="180" width="210" height="44" rx="6" class="obj-box"/>
+<text x="305" y="198" class="obj-text">CustomMultiTilesetBehaviour</text>
+<text x="305" y="213" class="obj-sub">IO.B3DM</text>
+
+<!-- B3dmTileset -->
+<rect x="460" y="180" width="140" height="44" rx="6" class="obj-box"/>
+<text x="530" y="198" class="obj-text">B3dmTileset</text>
+<text x="530" y="213" class="obj-sub">IO.B3DM</text>
+
+<!-- B3DMLoader -->
+<rect x="660" y="180" width="120" height="44" rx="6" class="obj-box"/>
+<text x="720" y="198" class="obj-text">B3DMLoader</text>
+<text x="720" y="213" class="obj-sub">IO.B3DM</text>
+
+<!-- B3dmTilesetTraversal -->
+<rect x="340" y="340" width="185" height="44" rx="6" class="obj-box"/>
+<text x="432" y="358" class="obj-text">B3dmTilesetTraversal</text>
+<text x="432" y="373" class="obj-sub">IO.B3DM</text>
+
+<!-- B3dmTile -->
+<rect x="110" y="340" width="120" height="44" rx="6" class="obj-box"/>
+<text x="170" y="358" class="obj-text">B3dmTile</text>
+<text x="170" y="373" class="obj-sub">IO.B3DM</text>
+
+<!-- B3dmTileContent -->
+<rect x="110" y="480" width="140" height="44" rx="6" class="obj-box"/>
+<text x="180" y="498" class="obj-text">B3dmTileContent</text>
+<text x="180" y="513" class="obj-sub">IO.B3DM</text>
+
+<!-- B3dmObject -->
+<rect x="320" y="480" width="120" height="44" rx="6" class="obj-box"/>
+<text x="380" y="498" class="obj-text">B3dmObject</text>
+<text x="380" y="513" class="obj-sub">IO.B3DM</text>
+
+<!-- B3dmObjectManager -->
+<rect x="510" y="480" width="160" height="44" rx="6" class="obj-box"/>
+<text x="590" y="498" class="obj-text">B3dmObjectManager</text>
+<text x="590" y="513" class="obj-sub">«Singleton»</text>
+
+<!-- ── Arrows ── -->
+
+<!-- 1. Viewer3D → B3dmDataSource: StartTile -->
+<line x1="160" y1="48" x2="220" y2="48" stroke="#1a6a1a" stroke-width="1.5" marker-end="url(#arr-g)"/>
+<text x="162" y="43" class="msg-g">1. StartTile(url)</text>
+
+<!-- 2. Viewer3D → WorldGlobe: Initialize -->
+<line x1="160" y1="62" x2="460" y2="62" stroke="#1a6a1a" stroke-width="1.5" marker-end="url(#arr-g)"/>
+<text x="270" y="76" class="msg-g">2. Initialize(view, lat, lon)</text>
+
+<!-- 3. B3dmDataSource → CustomMultiTilesetBehaviour -->
+<line x1="300" y1="74" x2="300" y2="180" stroke="#1a6a1a" stroke-width="1.5" marker-end="url(#arr-g)"/>
+<text x="304" y="132" class="msg-g">3. Initialize()</text>
+
+<!-- 4. WorldGlobe → CustomMultiTilesetBehaviour -->
+<line x1="490" y1="74" x2="390" y2="180" stroke="#1a6a1a" stroke-width="1.5" marker-end="url(#arr-g)"/>
+<text x="415" y="140" class="msg-g">4. owns</text>
+
+<!-- 5. CustomMultiTilesetBehaviour → B3dmTileset -->
+<line x1="410" y1="202" x2="460" y2="202" stroke="#8B0000" stroke-width="1.5" marker-end="url(#arr-r)"/>
+<text x="412" y="196" class="msg-r">5. InitializeAsync(url)</text>
+
+<!-- 6. B3dmTileset → B3DMLoader -->
+<line x1="600" y1="202" x2="660" y2="202" stroke="#8B0000" stroke-width="1.5" marker-end="url(#arr-r)"/>
+<text x="602" y="196" class="msg-r">6. LoadStream(url)</text>
+
+<!-- 7. B3dmTileset → B3dmTilesetTraversal -->
+<line x1="530" y1="224" x2="490" y2="340" stroke="#8B0000" stroke-width="1.5" marker-end="url(#arr-r)"/>
+<text x="508" y="292" class="msg-r">7. Traversal.Run()</text>
+
+<!-- WorldGlobe → B3dmTileset OnUpdate (dashed) -->
+<line x1="530" y1="74" x2="530" y2="180" stroke="#1a1a8a" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arr-b)"/>
+<text x="534" y="132" class="msg-b">OnUpdate()</text>
+
+<!-- 8. B3dmTilesetTraversal → B3dmTile: RequestTile -->
+<line x1="340" y1="358" x2="230" y2="358" stroke="#1a1a8a" stroke-width="1.5" marker-end="url(#arr-b)"/>
+<text x="243" y="352" class="msg-b">8. RequestTile()</text>
+
+<!-- 9. B3dmTilesetTraversal → B3dmTile: ToggleTiles -->
+<line x1="340" y1="372" x2="230" y2="372" stroke="#1a1a8a" stroke-width="1.5" marker-end="url(#arr-b)"/>
+<text x="243" y="388" class="msg-b">9. ToggleTiles()</text>
+
+<!-- B3dmTile self loop: RequestContentAsync -->
+<path d="M 110 355 C 60 355 60 390 110 390" stroke="#8B0000" stroke-width="1.5" fill="none" marker-end="url(#arr-r)"/>
+<text x="4" y="370" class="msg-r">Request</text>
+<text x="4" y="381" class="msg-r">ContentAsync()</text>
+
+<!-- 10. B3dmTile → B3dmTileContent -->
+<line x1="170" y1="384" x2="170" y2="480" stroke="#1a1a8a" stroke-width="1.5" marker-end="url(#arr-b)"/>
+<text x="174" y="437" class="msg-b">10. SetActive()</text>
+
+<!-- 11. B3dmTileContent → B3dmObject -->
+<line x1="250" y1="502" x2="320" y2="502" stroke="#1a1a8a" stroke-width="1.5" marker-end="url(#arr-b)"/>
+<text x="252" y="496" class="msg-b">11. Go→Render(ctx)</text>
+
+<!-- 12. B3dmObject → B3dmObjectManager -->
+<line x1="440" y1="502" x2="510" y2="502" stroke="#1a1a8a" stroke-width="1.5" marker-end="url(#arr-b)"/>
+<text x="442" y="496" class="msg-b">12. Instantiate()</text>
+
+<!-- ── Legend ── -->
+<rect x="680" y="440" width="205" height="90" rx="6" fill="#f9f9f9" stroke="#ccc" stroke-width="1"/>
+<text x="692" y="458" font-size="10" font-weight="bold" fill="#333">범례 (Legend)</text>
+<line x1="692" y1="470" x2="718" y2="470" stroke="#1a6a1a" stroke-width="1.5" marker-end="url(#arr-g)"/>
+<text x="723" y="474" font-size="9" fill="#333">초기화 (Initialization)</text>
+<line x1="692" y1="486" x2="718" y2="486" stroke="#8B0000" stroke-width="1.5" marker-end="url(#arr-r)"/>
+<text x="723" y="490" font-size="9" fill="#333">로드 (Load)</text>
+<line x1="692" y1="502" x2="718" y2="502" stroke="#1a1a8a" stroke-width="1.5" marker-end="url(#arr-b)"/>
+<text x="723" y="506" font-size="9" fill="#333">업데이트/렌더 (Update)</text>
+<line x1="692" y1="518" x2="718" y2="518" stroke="#1a1a8a" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arr-b)"/>
+<text x="723" y="522" font-size="9" fill="#333">반복 루프 (Loop)</text>
+
+</svg>

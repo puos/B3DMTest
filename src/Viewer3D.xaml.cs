@@ -9,8 +9,6 @@ using A4L.MP3DCore.Scene;
 using A4L.MP3DCore.Scene.InputHandler.HUDInputHandler;
 using A4L.MP3DCore.Scene.InputHandler.ViewingInputHandler;
 using A4L.MP3DCore.Scene.Renderer;
-using B3DMTest.Tools;
-using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -26,7 +24,7 @@ public partial class Viewer3D : Window
     private HUD3AxisInputHandler? _axisHud;
     private DispatcherTimer? _updateTimer;
     private B3dmDataSource? _b3dmDataSource;
-    private LocalFileServer? _fileServer;
+    //private LocalFileServer? _fileServer;
 
     public Viewer3D()
     {
@@ -108,24 +106,24 @@ public partial class Viewer3D : Window
         
     }
 
-    private void btnOpen_Click(object sender, RoutedEventArgs e)
+    private void btnLoad_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new OpenFileDialog
-        {
-            Filter = "Tileset files (tileset.json)|tileset.json|All files (*.*)|*.*",
-            Title = "tileset.json 파일 선택"
-        };
-
-        if (dlg.ShowDialog() != true) return;
-
-        LoadB3DM(dlg.FileName);
+        var url = txtUrl.Text.Trim();
+        if (string.IsNullOrEmpty(url)) return;
+        LoadB3DM(url);
     }
 
-    private void LoadB3DM(string filePath)
+    private void txtUrl_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+            LoadB3DM(txtUrl.Text.Trim());
+    }
+
+    private void LoadB3DM(string urlPath)
     {
         try
         {
-            txtStatus.Text = $"로딩 중... {System.IO.Path.GetFileName(filePath)}";
+            //txtStatus.Text = $"로딩 중... {System.IO.Path.GetFileName(filePath)}";
 
             SceneView!.NearFarUpdater.FarUpdateEnable = false;
             SceneView.NearFarUpdater.NearUpdateEnable = false;
@@ -139,11 +137,11 @@ public partial class Viewer3D : Window
 
             _b3dmDataSource = new B3dmDataSource(WorldGlobe.Instance);
 
-            _fileServer?.Dispose();
-            _fileServer = new LocalFileServer(System.IO.Path.GetDirectoryName(filePath)!);
-            _fileServer.Start();
-            var httpUrl = $"http://localhost:{_fileServer.Port}/{System.IO.Path.GetFileName(filePath)}";
-            _b3dmDataSource.StartTile(httpUrl);   // async void — fire and forget
+            //_fileServer?.Dispose();
+            //_fileServer = new LocalFileServer(System.IO.Path.GetDirectoryName(filePath)!);
+            //_fileServer.Start();
+            //var httpUrl = $"http://localhost:{_fileServer.Port}/{System.IO.Path.GetFileName(filePath)}";
+            _b3dmDataSource.StartTile(urlPath);   // async void — fire and forget
 
             Workspace.Instance.DataSources.Add(_b3dmDataSource);
             var group = _b3dmDataSource.CreateRenderableGroup();
@@ -153,7 +151,7 @@ public partial class Viewer3D : Window
 
             ZoomFit();
 
-            txtStatus.Text = $"로드 완료: {System.IO.Path.GetFileName(filePath)}";
+            txtStatus.Text = $"로드 완료: {urlPath}";
         }
         catch (Exception ex)
         {
@@ -189,7 +187,7 @@ public partial class Viewer3D : Window
     private void Window_Closed(object sender, EventArgs e)
     {
         _updateTimer?.Stop();
-        _fileServer?.Dispose();
+        //_fileServer?.Dispose();
 
         if (SceneView != null)
         {

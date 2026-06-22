@@ -17,7 +17,7 @@
         <StackPanel Grid.Row="0" Orientation="Horizontal" Background="#FF2D2D30" VerticalAlignment="Center" Margin="4,0">
             <TextBlock Text="URL:" Foreground="White" VerticalAlignment="Center" Margin="4,0"/>
             <TextBox x:Name="txtUrl" Width="500" Margin="4,0" Padding="4,2" VerticalAlignment="Center"
-                     Text="https://211.178.39.228:22480//terra_b3dms_HyeopjaeBeach/tileset.json"
+                     Text="https://211.178.39.228:22480/terra_b3dms_HyeopjaeBeach/tileset.json"
                      KeyDown="txtUrl_KeyDown"/>
             <Button x:Name="btnLoad" Content="OK" Margin="4,0" Padding="12,4"
                     Click="btnLoad_Click"/>

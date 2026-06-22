@@ -133,7 +133,7 @@ public partial class Viewer3D : Window
             Workspace.Instance.DataSources.Clear();
 
             // 지구 좌표 원점 설정 (서울 기본값)
-            WorldGlobe.Instance.Initialize(SceneView.View, 33.214, 126.252, 100); // 모슬포항
+            WorldGlobe.Instance.Initialize(SceneView.View, 33.394127, 126.236928, 100); // 협재해변
 
             _b3dmDataSource = new B3dmDataSource(WorldGlobe.Instance);
 

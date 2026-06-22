@@ -3,6 +3,7 @@ using System.Net.Security;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using A4L.Mapprime3DNet.IO.B3DM;
 using A4L.Mapprime3DNet.IO.B3DM.GLTF.Loader;
 
 namespace B3DMTest.Tools;
@@ -25,6 +26,18 @@ internal static class SslBypass
     {
         if (_applied) return;
 
+        // MapPrimeNet 내부에서 자체 서명 HTTPS 서버에 접근하는 모든 private static readonly HttpClient 를
+        // 인증서 검증 우회 버전으로 교체한다.
+        //  - WebRequestLoader.httpClient : b3dm / 텍스처 등 콘텐츠 다운로드
+        //  - B3dmTileset.httpClient      : tileset.json (루트 및 자식) 다운로드
+        PatchHttpClientField(typeof(WebRequestLoader));
+        PatchHttpClientField(typeof(B3dmTileset));
+
+        _applied = true;
+    }
+
+    private static HttpClient CreateBypassClient()
+    {
         var handler = new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
@@ -40,33 +53,35 @@ internal static class SslBypass
             }
         };
 
-        var client = new HttpClient(handler)
+        return new HttpClient(handler)
         {
-            Timeout = TimeSpan.FromSeconds(15)
+            Timeout = TimeSpan.FromSeconds(30)
         };
+    }
 
+    private static void PatchHttpClientField(Type owner)
+    {
         // static 필드 이니셜라이저(원본 httpClient 생성)를 먼저 실행시킨 뒤 덮어쓴다.
-        RuntimeHelpers.RunClassConstructor(typeof(WebRequestLoader).TypeHandle);
+        RuntimeHelpers.RunClassConstructor(owner.TypeHandle);
 
-        var field = typeof(WebRequestLoader).GetField(
+        var field = owner.GetField(
             "httpClient", BindingFlags.NonPublic | BindingFlags.Static);
 
         if (field == null)
             throw new InvalidOperationException(
-                "WebRequestLoader.httpClient 필드를 찾지 못했습니다. MapPrimeNet 구현이 변경되었을 수 있습니다.");
+                $"{owner.Name}.httpClient 필드를 찾지 못했습니다. MapPrimeNet 구현이 변경되었을 수 있습니다.");
 
         // .NET 8 에서는 initonly(static readonly) 필드를 Reflection SetValue 로 변경할 수 없으므로
         // DynamicMethod 로 stsfld IL 을 직접 emit 하여 우회한다.
         var dm = new DynamicMethod(
             "__set_httpClient", null, new[] { typeof(HttpClient) },
-            typeof(WebRequestLoader), skipVisibility: true);
+            owner, skipVisibility: true);
         var il = dm.GetILGenerator();
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Stsfld, field);
         il.Emit(OpCodes.Ret);
         var setter = (Action<HttpClient>)dm.CreateDelegate(typeof(Action<HttpClient>));
 
-        setter(client);
-        _applied = true;
+        setter(CreateBypassClient());
     }
 }

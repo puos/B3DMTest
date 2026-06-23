@@ -1,0 +1,146 @@
+<svg viewBox="0 0 1080 860" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <style>
+    text { font-family: 'Segoe UI', Arial, sans-serif; }
+    .obj-box { fill: #EEF3FB; stroke: #4A6FA5; stroke-width: 2; }
+    .key-box { fill: #FFF3E8; stroke: #C77A30; stroke-width: 2; }
+    .cam-box { fill: #ECF8EC; stroke: #3a8a3a; stroke-width: 2; }
+    .obj-text { font-size: 12px; font-weight: bold; fill: #1a3a6a; text-anchor: middle; }
+    .key-text { font-size: 12px; font-weight: bold; fill: #8a4a10; text-anchor: middle; }
+    .cam-text { font-size: 12px; font-weight: bold; fill: #1a5a1a; text-anchor: middle; }
+    .obj-sub { font-size: 9px; fill: #557; text-anchor: middle; }
+    .msg  { font-size: 10px; font-weight: bold; paint-order: stroke;
+            stroke: #ffffff; stroke-width: 3.5px; stroke-linejoin: round; }
+    .note { font-size: 9.5px; fill: #333; }
+    .g { fill: #1a6a1a; } .r { fill: #8B0000; } .b { fill: #1a1a8a; }
+  </style>
+  <marker id="ag" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#1a6a1a"/></marker>
+  <marker id="ar" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#8B0000"/></marker>
+  <marker id="ab" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#1a1a8a"/></marker>
+</defs>
+
+<rect width="1080" height="860" fill="white"/>
+<text x="30" y="26" font-size="14" font-weight="bold" fill="#222">UpdateWorldOrigin 협력 다이어그램 — ECEF → 원점-상대 좌표 변환</text>
+
+<!-- ===== Objects ===== -->
+<rect x="30"  y="55"  width="170" height="48" rx="6" class="obj-box"/>
+<text x="115" y="75"  class="obj-text">WorldGlobe</text>
+<text x="115" y="91"  class="obj-sub">Initialize()</text>
+
+<rect x="300" y="55"  width="200" height="48" rx="6" class="key-box"/>
+<text x="400" y="75"  class="key-text">Coordinates / worldContext</text>
+<text x="400" y="91"  class="obj-sub">WorldOrigin 저장</text>
+
+<rect x="600" y="55"  width="220" height="48" rx="6" class="cam-box"/>
+<text x="710" y="75"  class="cam-text">ViewPort.Camera</text>
+<text x="710" y="91"  class="obj-sub">LookAt = 원점-상대(≈0)</text>
+
+<rect x="300" y="180" width="240" height="48" rx="6" class="obj-box"/>
+<text x="420" y="200" class="obj-text">CustomMultiTilesetBehaviour</text>
+<text x="420" y="216" class="obj-sub">UpdateWorldOrigin(WorldOrigin)</text>
+
+<rect x="640" y="180" width="180" height="48" rx="6" class="obj-box"/>
+<text x="730" y="200" class="obj-text">B3dmTileset</text>
+<text x="730" y="216" class="obj-sub">GetRootTransform()</text>
+
+<rect x="300" y="300" width="240" height="52" rx="6" class="key-box"/>
+<text x="420" y="320" class="key-text">B3dmTile.UpdateWorldOriginRight</text>
+<text x="420" y="337" class="obj-sub">원점 차감 + computedTransform</text>
+
+<rect x="300" y="430" width="240" height="52" rx="6" class="key-box"/>
+<text x="420" y="450" class="key-text">CreateBoundingVolume</text>
+<text x="420" y="467" class="obj-sub">OBB.Transform(computedTransform)</text>
+
+<rect x="300" y="560" width="240" height="48" rx="6" class="obj-box"/>
+<text x="420" y="580" class="obj-text">B3dmTilesetTraversal</text>
+<text x="420" y="596" class="obj-sub">DetermineFrustumSet()</text>
+
+<rect x="640" y="562" width="200" height="44" rx="6" class="cam-box"/>
+<text x="740" y="582" class="cam-text">IntersectPlanes()</text>
+<text x="740" y="597" class="obj-sub">frustum 판정</text>
+
+<!-- ===== Arrows ===== -->
+<!-- 1 WorldGlobe → Coordinates SetOrigin -->
+<line x1="200" y1="73" x2="300" y2="73" stroke="#1a6a1a" stroke-width="1.6" marker-end="url(#ag)"/>
+<text x="205" y="68" class="msg g">1. SetOrigin(geodetic)</text>
+
+<!-- 2 WorldGlobe → Camera LookAt -->
+<polyline points="115,103 115,135 710,135 710,103" fill="none" stroke="#1a6a1a" stroke-width="1.6" marker-end="url(#ag)"/>
+<text x="360" y="130" class="msg g">2. Camera.LookAt = convertCoordinateToVector(원점) ≈ (0,0,0)</text>
+
+<!-- 3 Behaviour ← (TilesetComplete) : 진입 -->
+<line x1="420" y1="103" x2="420" y2="180" stroke="#1a1a8a" stroke-width="1.6" marker-end="url(#ab)"/>
+<text x="424" y="150" class="msg b">3. TilesetComplete → UpdateWorldOrigin()</text>
+
+<!-- 4 Behaviour → B3dmTile (UpdateTile recursive) -->
+<line x1="420" y1="228" x2="420" y2="300" stroke="#1a1a8a" stroke-width="1.6" marker-end="url(#ab)"/>
+<text x="424" y="266" class="msg b">4. UpdateTile(root) ↻ 재귀</text>
+
+<!-- 5 B3dmTile → Coordinates GetWorldOrign / InvRotation -->
+<polyline points="540,318 580,318 580,79 500,79" fill="none" stroke="#8B0000" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="548" y="250" class="msg r">5. GetWorldOrign()</text>
+<text x="548" y="263" class="msg r">   GetWorldInvRotation()</text>
+
+<!-- 6 B3dmTile → B3dmTileset GetRootTransform -->
+<polyline points="540,310 640,250 640,228" fill="none" stroke="#8B0000" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="556" y="300" class="msg r">6. GetRootTransform() = worldRot</text>
+
+<!-- 7 B3dmTile → CreateBoundingVolume -->
+<line x1="420" y1="352" x2="420" y2="430" stroke="#1a1a8a" stroke-width="1.6" marker-end="url(#ab)"/>
+<text x="424" y="394" class="msg b">7. CreateBoundingVolume(box, computedTransform)</text>
+
+<!-- 8 CreateBoundingVolume → Traversal (BoundingVolume 보유) -->
+<line x1="420" y1="482" x2="420" y2="560" stroke="#1a1a8a" stroke-width="1.6" marker-end="url(#ab)"/>
+<text x="424" y="524" class="msg b">8. tile.BoundingVolume 생성</text>
+
+<!-- 9 Traversal → IntersectPlanes -->
+<line x1="540" y1="584" x2="640" y2="584" stroke="#8B0000" stroke-width="1.6" marker-end="url(#ar)"/>
+<text x="544" y="558" class="msg r">9. IntersectPlanes(카메라 frustum)</text>
+
+<!-- Camera frame note line to traversal -->
+<line x1="740" y1="103" x2="740" y2="562" stroke="#3a8a3a" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ab)"/>
+<text x="744" y="340" class="msg g">카메라 frame</text>
+<text x="744" y="353" class="msg g">(원점-상대)</text>
+
+<!-- ===== Step detail box ===== -->
+<rect x="30" y="300" width="250" height="250" rx="6" fill="#FFFDF7" stroke="#C77A30" stroke-width="1.2"/>
+<text x="42" y="320" font-size="11" font-weight="bold" fill="#8a4a10">UpdateWorldOriginRight 내부</text>
+<text x="42" y="340" class="note">① transform = schemaTile.GetTransform()</text>
+<text x="42" y="356" class="note">② (root) position = transform.Position</text>
+<text x="42" y="370" class="note">          + Tileset.Translation</text>
+<text x="42" y="388" class="note" fill="#8B0000" font-weight="bold">③ worldOrigin = invRot · GetWorldOrign()</text>
+<text x="42" y="404" class="note" fill="#8B0000" font-weight="bold">④ pos3d = ToGeocentric(position)</text>
+<text x="42" y="418" class="note" fill="#8B0000" font-weight="bold">          − worldOrigin   ← 원점 차감</text>
+<text x="42" y="436" class="note">⑤ transform = TRS(pos3d, rot, scale)</text>
+<text x="42" y="454" class="note">⑥ parent = GetRootTransform()=worldRot</text>
+<text x="42" y="472" class="note">⑦ computedTransform =</text>
+<text x="42" y="486" class="note">      transform.Matrix × parent.Matrix</text>
+<text x="42" y="504" class="note">⑧ OBB(원본 ECEF box)</text>
+<text x="42" y="518" class="note">      .Transform(computedTransform)</text>
+<text x="42" y="538" class="note" fill="#1a1a8a">⇒ 기대: center ≈ (0,0,0)</text>
+
+<!-- ===== Discrepancy / Legend ===== -->
+<rect x="600" y="640" width="450" height="190" rx="6" fill="#FFF0F0" stroke="#8B0000" stroke-width="1.4"/>
+<text x="614" y="662" font-size="12" font-weight="bold" fill="#8B0000">⚠ 관측된 불일치 (현재 증상)</text>
+<text x="614" y="684" class="note">• 정상(Unity OBB center): (-27908, -15, 545)  ← 원점-상대</text>
+<text x="614" y="702" class="note">• 현재(MapPrimeNet center): (2217719, 2304534, 5510878)</text>
+<text x="614" y="720" class="note">• |center| ≈ 6.37×10⁶ = 지구 반지름 = 원본 ECEF 크기</text>
+<text x="614" y="742" class="note" font-weight="bold">→ 회전만 적용되고 worldOrigin 차감이 결과에 반영 안 됨</text>
+<text x="614" y="762" class="note">   (computedTransform 의 translation 이 OBB center 에</text>
+<text x="614" y="776" class="note">    살아남지 못함 — 합성 순서/translation 손실 의심)</text>
+<text x="614" y="798" class="note" fill="#8B0000" font-weight="bold">결과: IntersectPlanes = OUTSIDE → isInclude=false → 순회 중단</text>
+<text x="614" y="816" class="note">      (카메라는 원점-상대인데 타일은 절대좌표라 6,000km 밖)</text>
+
+<!-- Legend small -->
+<rect x="30" y="600" width="250" height="120" rx="6" fill="#f9f9f9" stroke="#ccc"/>
+<text x="42" y="620" font-size="11" font-weight="bold" fill="#333">범례</text>
+<line x1="42" y1="636" x2="70" y2="636" stroke="#1a6a1a" stroke-width="1.6" marker-end="url(#ag)"/>
+<text x="76" y="640" class="note">초기화 / 원점 설정</text>
+<line x1="42" y1="656" x2="70" y2="656" stroke="#1a1a8a" stroke-width="1.6" marker-end="url(#ab)"/>
+<text x="76" y="660" class="note">변환 호출 (재귀 포함)</text>
+<line x1="42" y1="676" x2="70" y2="676" stroke="#8B0000" stroke-width="1.6" marker-end="url(#ar)"/>
+<text x="76" y="680" class="note">좌표/행렬 조회·판정</text>
+<rect x="42" y="690" width="14" height="10" class="key-box"/>
+<text x="62" y="699" class="note">원점 차감 관련 핵심 단계</text>
+
+</svg>

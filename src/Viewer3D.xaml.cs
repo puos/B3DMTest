@@ -25,6 +25,7 @@ public partial class Viewer3D : Window
     private DispatcherTimer? _updateTimer;
     private B3dmDataSource? _b3dmDataSource;
     //private LocalFileServer? _fileServer;
+    private bool _pendingZoomFit;
 
     public Viewer3D()
     {
@@ -103,7 +104,16 @@ public partial class Viewer3D : Window
             txtCameraPos.Text = $"Camera: ({cam.Position.X:F2}, {cam.Position.Y:F2}, {cam.Position.Z:F2})";
         }
 
-        
+        // 타일 콘텐츠가 로드되어 bbox 가 유효해지면 1회만 ZoomFit 으로 화면 맞춤
+        if (_pendingZoomFit)
+        {
+            var bb = Workspace.Instance.BoundingBox;
+            if (bb != null && bb.Valid && bb.MaxLength > 0 && !double.IsNaN(bb.MaxLength))
+            {
+                ZoomFit();
+                _pendingZoomFit = false;
+            }
+        }
     }
 
     private void btnLoad_Click(object sender, RoutedEventArgs e)
@@ -132,8 +142,7 @@ public partial class Viewer3D : Window
             SceneView.SceneGroups.Clear();
             Workspace.Instance.DataSources.Clear();
 
-            // 지구 좌표 원점 설정 (서울 기본값)
-            WorldGlobe.Instance.Initialize(SceneView.View, 33.394127, 126.236928, 100); // 협재해변
+            WorldGlobe.Instance.Initialize(SceneView.View, 33.398628, 126.243173, 0); // 협재 해수욕장
 
             _b3dmDataSource = new B3dmDataSource(WorldGlobe.Instance);
 
@@ -149,7 +158,6 @@ public partial class Viewer3D : Window
 
             Workspace.Instance.CommandUi.RefreshSceneGroup();
 
-            ZoomFit();
 
             txtStatus.Text = $"로드 완료: {urlPath}";
         }
@@ -164,6 +172,8 @@ public partial class Viewer3D : Window
     {
         var bb = Workspace.Instance.BoundingBox;
         if (bb == null || ViewController == null) return;
+        // 타일 콘텐츠가 아직 로드되지 않아 bbox 가 비어 있으면(Valid=false / MaxLength<=0) 적용하지 않는다.
+        if (!bb.Valid || bb.MaxLength <= 0 || double.IsNaN(bb.MaxLength)) return;
 
         double fovY = ViewController.View.FovY;
         double distance = 1.0 / (2.0 * Math.Tan(fovY / 2.0 * (Math.PI / 180.0)) / bb.MaxLength) + 50;

@@ -25,8 +25,7 @@
 
         <!-- 3D 뷰어 영역 -->
         <Border Grid.Row="1" Background="#0F1A33" BorderThickness="1" BorderBrush="#444"
-                KeyDown="Border_KeyDown" KeyUp="Border_KeyUp"
-                MouseWheel="clientView_MouseWheel">
+                KeyDown="Border_KeyDown" KeyUp="Border_KeyUp">
             <Grid x:Name="clientViewGrid"/>
         </Border>
 

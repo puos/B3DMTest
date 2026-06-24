@@ -4,6 +4,7 @@ using A4L.Mapprime3DNet.Common.Workspaces;
 using A4L.Mapprime3DNet.IO.DataSource;
 using A4L.Mapprime3DNet.IO.World;
 using A4L.Mapprime3DNet.View;
+using A4L.MP3DCore.Common.DebugUtils;
 using A4L.MP3DCore.Common.Math;
 using A4L.MP3DCore.Scene;
 using A4L.MP3DCore.Scene.InputHandler.HUDInputHandler;
@@ -22,15 +23,15 @@ public partial class Viewer3D : Window
     public SceneView? SceneView => _objectsViewWPF?.SceneView;
 
     private HUD3AxisInputHandler? _axisHud;
-    private DispatcherTimer? _updateTimer;
     private B3dmDataSource? _b3dmDataSource;
-    //private LocalFileServer? _fileServer;
     private bool _pendingZoomFit;
 
     public Viewer3D()
     {
         InitializeComponent();
         InitializeScene();
+
+       // DebugHelper.GetInstance().AddSphere(new Vector3d(0, 0, -20), 5.0, ColorF.Red);
     }
 
     private void InitializeScene()
@@ -39,21 +40,22 @@ public partial class Viewer3D : Window
         _objectsViewWPF.SetController(new ViewController());
         ConfigureNearFar();
 
-        _objectsViewWPF.Width = 811;
-        _objectsViewWPF.Height = 361;
+        SetSize(_objectsViewWPF, new Size(811, 361));
         clientViewGrid.Children.Add(_objectsViewWPF);
         _objectsViewWPF.HorizontalAlignment = HorizontalAlignment.Stretch;
         _objectsViewWPF.VerticalAlignment = VerticalAlignment.Stretch;
         clientViewGrid.SizeChanged += (s, e) =>
         {
-            SetSize(_objectsViewWPF,e.NewSize);
+            SetSize(_objectsViewWPF, e.NewSize);
         };
 
-        SceneView!.ShowDebugFPS = true;
+        SceneView.DebugHelper = GlobalContext.GetInstance().DebugHelper;
+
+        SceneView.DebugHelper.Enable = true;
+        SceneView.DebugHelper.Visible = true;
+        SceneView.DebugHelper.LockObject = new object();
         _objectsViewWPF.BackFaceCulling = true;
 
-        //SceneView.RenderAbort = (sta, dist) =>
-        //    sta.DrawCallCount >= 18000 && dist >= 1000;
 
         Workspace.Instance.Owner = this;
         Workspace.Instance.ViewControl = _objectsViewWPF;
@@ -71,18 +73,22 @@ public partial class Viewer3D : Window
 
         GlobalOption.BackgroundColor = new ColorF(0.06f, 0.10f, 0.20f, 1.0f);
         ViewController!.BackgroundColor.Set(GlobalOption.BackgroundColor);
+
+
+        Workspace.Instance.CommandUi.UpdateCameraDistance();
+        Workspace.Instance.CommandUi.UpdateMouseDistance();
+
+        ViewController.ViewingZoomMoveSpeedPerSecond = GlobalOption.MouseZoom / 50.0;
+
         ViewController.PolygonMode = PolygonModes.Fill;
+        ViewController.SceneView.Renderer.ShadingMode = GlobalOption.ShadingMode;
 
         var cameraController = new CustomCameraController();
         cameraController.ZoomMinDistance = 1.0;
-       
+
         ViewController.InputHandlers.Remove(cameraController);
         ViewController.InputHandlers.Add(cameraController);
         ViewController.InputHandlers.SetViewingMode(cameraController);
-
-        _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-        _updateTimer.Tick += UpdateTimer_Tick;
-        _updateTimer.Start();
     }
 
     private void ConfigureNearFar()
@@ -96,26 +102,7 @@ public partial class Viewer3D : Window
         GlobalOption.Far = 10000;
     }
 
-    private void UpdateTimer_Tick(object? sender, EventArgs e)
-    {
-        if (SceneView?.View?.Camera != null)
-        {
-            var cam = SceneView.View.Camera;
-            txtCameraPos.Text = $"Camera: ({cam.Position.X:F2}, {cam.Position.Y:F2}, {cam.Position.Z:F2})";
-        }
-
-        // 타일 콘텐츠가 로드되어 bbox 가 유효해지면 1회만 ZoomFit 으로 화면 맞춤
-        if (_pendingZoomFit)
-        {
-            var bb = Workspace.Instance.BoundingBox;
-            if (bb != null && bb.Valid && bb.MaxLength > 0 && !double.IsNaN(bb.MaxLength))
-            {
-                ZoomFit();
-                _pendingZoomFit = false;
-            }
-        }
-    }
-
+   
     private void btnLoad_Click(object sender, RoutedEventArgs e)
     {
         var url = txtUrl.Text.Trim();
@@ -196,7 +183,6 @@ public partial class Viewer3D : Window
 
     private void Window_Closed(object sender, EventArgs e)
     {
-        _updateTimer?.Stop();
         //_fileServer?.Dispose();
 
         if (SceneView != null)
@@ -223,5 +209,5 @@ public partial class Viewer3D : Window
         }
     }
 
-    private void clientView_MouseWheel(object sender, MouseWheelEventArgs e) { }
+    
 }

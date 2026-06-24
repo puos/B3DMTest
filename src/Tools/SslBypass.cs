@@ -30,8 +30,10 @@ internal static class SslBypass
         // 인증서 검증 우회 버전으로 교체한다.
         //  - WebRequestLoader.httpClient : b3dm / 텍스처 등 콘텐츠 다운로드
         //  - B3dmTileset.httpClient      : tileset.json (루트 및 자식) 다운로드
+        //  - B3dmTile.httpClient         : 외부 블록 tileset.json (DownloadTileJson) 다운로드
         PatchHttpClientField(typeof(WebRequestLoader));
         PatchHttpClientField(typeof(B3dmTileset));
+        PatchHttpClientField(typeof(B3dmTile));
 
         _applied = true;
     }

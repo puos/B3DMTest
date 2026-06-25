@@ -30,8 +30,6 @@ public partial class Viewer3D : Window
     {
         InitializeComponent();
         InitializeScene();
-
-       // DebugHelper.GetInstance().AddSphere(new Vector3d(0, 0, -20), 5.0, ColorF.Red);
     }
 
     private void InitializeScene()
@@ -54,8 +52,8 @@ public partial class Viewer3D : Window
         SceneView.DebugHelper.Enable = true;
         SceneView.DebugHelper.Visible = true;
         SceneView.DebugHelper.LockObject = new object();
-        _objectsViewWPF.BackFaceCulling = true;
-
+        _objectsViewWPF.BackFaceCulling = false;
+        SceneView.ShowDebugFPS = true;
 
         Workspace.Instance.Owner = this;
         Workspace.Instance.ViewControl = _objectsViewWPF;
@@ -82,6 +80,7 @@ public partial class Viewer3D : Window
 
         ViewController.PolygonMode = PolygonModes.Fill;
         ViewController.SceneView.Renderer.ShadingMode = GlobalOption.ShadingMode;
+        
 
         var cameraController = new CustomCameraController();
         cameraController.ZoomMinDistance = 1.0;
@@ -177,7 +176,10 @@ public partial class Viewer3D : Window
         element.Height = value.Height;
     }
 
-    private void Window_Loaded(object sender, RoutedEventArgs e) { }
+    private void Window_Loaded(object sender, RoutedEventArgs e) 
+    {
+        LoadB3DM(txtUrl.Text.Trim());
+    }
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e) { }
 

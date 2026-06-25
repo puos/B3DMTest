@@ -82,12 +82,12 @@ public partial class Viewer3D : Window
         ViewController.SceneView.Renderer.ShadingMode = GlobalOption.ShadingMode;
         
 
-        var cameraController = new CustomCameraController();
-        cameraController.ZoomMinDistance = 1.0;
+        //var cameraController = new CustomCameraController();
+        //cameraController.ZoomMinDistance = 1.0;
 
-        ViewController.InputHandlers.Remove(cameraController);
-        ViewController.InputHandlers.Add(cameraController);
-        ViewController.InputHandlers.SetViewingMode(cameraController);
+        //ViewController.InputHandlers.Remove(cameraController);
+        //ViewController.InputHandlers.Add(cameraController);
+        //ViewController.InputHandlers.SetViewingMode(cameraController);
     }
 
     private void ConfigureNearFar()
@@ -107,6 +107,8 @@ public partial class Viewer3D : Window
         var url = txtUrl.Text.Trim();
         if (string.IsNullOrEmpty(url)) return;
         LoadB3DM(url);
+
+
     }
 
     private void txtUrl_KeyDown(object sender, KeyEventArgs e)
@@ -128,8 +130,8 @@ public partial class Viewer3D : Window
             SceneView.SceneGroups.Clear();
             Workspace.Instance.DataSources.Clear();
 
-            WorldGlobe.Instance.Initialize(SceneView.View, 33.398628, 126.243173, 0); // 협재 해수욕장
 
+            WorldGlobe.Instance.Initialize(SceneView.View, 33.398628, 126.243173, 0); // 협재 해수욕장
             _b3dmDataSource = new B3dmDataSource(WorldGlobe.Instance);
 
             //_fileServer?.Dispose();
@@ -177,8 +179,7 @@ public partial class Viewer3D : Window
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e) 
-    {
-        LoadB3DM(txtUrl.Text.Trim());
+    {        
     }
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e) { }

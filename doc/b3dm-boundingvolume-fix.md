@@ -1,124 +1,138 @@
-# B3DM BoundingVolume 좌표 프레임 버그 — 분석 및 수정안
+# B3DM BoundingVolume 버그 — 근본 원인과 수정 기록 (해결 완료 ✅)
 
-## 증상
+> 2026-07-05 기준. 협재해변 tileset 정상 렌더링 확인 완료.
+> 대상 코드: `D:\work\MapPrimeNetV2` (A4L.Mapprime3DNet / A4L.MP3DCore), RH(오른손/OpenGL) 빌드(LEFT_H 미정의).
+
+---
+
+## 증상 (해결 전)
 
 - 협재해변(제주) `tileset.json` 로드 시 화면에 아무것도 렌더링되지 않음.
-- `B3dmTilesetTraversal.DetermineFrustumSet(root)` 가 `false` 반환 → `isInclude=false` → 타일 순회/요청 전체 중단.
-- 원인: **root 타일의 `BoundingVolume.Center` 가 원점-상대가 아니라 절대 ECEF 로 남음.**
-
-### 관측 데이터
-
-| | OBB Center | 크기 |
-|---|---|---|
-| 원본 ECEF (tileset.json box) | `(-3151036, 4299528, 3490554)` | 6.37×10⁶ |
-| MapPrimeNet (Right 경로) | `(2217719, 2304534, 5510878)` | 6.37×10⁶ |
-| MapPrimeNet (Left 경로) | `(1555157, 5280849, 3208279)` | 6.37×10⁶ |
-| **정상 (Unity / NeoWorldDemo)** | `(-27908, -15, 545)` | 작음(원점-상대) |
-
-- 세 MapPrimeNet 결과 모두 크기 = **지구 반지름(6.37e6)** → 회전만 적용되고 **origin 차감이 안 됨**.
-- 카메라는 원점-상대 `(0, 0, 100)` 인데 타일은 절대 ECEF → 6,378km 떨어진 것으로 계산 → frustum OUTSIDE.
+- `B3dmTilesetTraversal.DetermineFrustumSet(root)` → `false` → 타일 순회/요청 전체 중단.
+- 타일 `BoundingVolume.Center`가 원점-상대가 아님 (지구 반지름급 ~6.37×10⁶, 케이스에 따라 8×10¹⁵까지 폭발).
+- 단, 콘텐츠(메시) 렌더링 경로는 정상 — **컬링 경로만 고장**.
 
 ---
 
-## 근본 원인
+## 전제: MP3DCore Matrix4d의 행렬 관례
 
-`UpdateWorldOriginLeft` 는 worldOrigin/transform 을 **X 반전된 좌표 프레임**에서 만든다:
+`Matrix4d`는 **행-벡터(row-vector, OSG 스타일) 관례**다. 이 사실이 모든 분석의 기준점이었다.
 
-```csharp
-// B3dmTile.UpdateWorldOriginLeft()
-t.X = -1d * position.X;   // ← transform 은 X 반전 프레임
-t.Y = position.Z;
-t.Z = position.Y;
-```
+| 항목 | 규칙 | 근거 |
+|------|------|------|
+| translation 저장 위치 | `[12],[13],[14]` (행4) | `Matrix4d.Translate` |
+| 점 변환 | `v' = v·M` → `PreMultiply` / `MultiplyPoint` | `_preMultiplySelf`: 회전은 열과 내적, translation은 [12-14]에서 가산 |
+| 변환 합성 | 먼저 적용할 것이 왼쪽 → `자식 * 부모` | `B3dmTile.cs` computedTransform |
+| TRS | `S * R * T` | `MathExtensions.TRS` |
+| 열-벡터 방향 함수 | `PostMultiply`/`PostMultiply3X3` — translation을 `[3],[7],[11]`에서 읽음 | 이 엔진 행렬에서 그 자리는 항상 0 |
 
-그런데 `CreateBoundingVolume` 의 box center 는 **raw ECEF(X 반전 안 됨)** 그대로 사용된다:
-
-```csharp
-// B3dmTile.CreateBoundingVolume()  (현재)
-Vector3d center = new Vector3d(box[0], box[1], box[2]);   // X 반전 없음
-```
-
-→ **box center 프레임 ≠ transform 프레임** → `result.Transform(computedTransform)` 에서 `−worldOrigin` 이 상쇄되지 않음 → 절대 ECEF 잔존.
-
-### Unity(NeoWorldDemo)는 어떻게 정상인가
-
-`Unity3DTile.CreateBoundingVolume()` 는 box 를 transform 적용 **전에 X 반전**한다 (Unity 는 왼손 좌표계):
-
-```csharp
-// Unity3DTile.cs : 576-579
-center.x   *= -1;
-halfAxesX.x *= -1;
-halfAxesY.x *= -1;
-halfAxesZ.x *= -1;
-
-var result = new TileOrientedBoundingBox(center, halfAxesX, halfAxesY, halfAxesZ);
-result.Transform(transform);
-```
-
-→ box center 가 transform 과 **같은 X 반전 프레임** → `−worldOrigin` 정상 상쇄 → 원점-상대.
-
-> 참고: `UnityTransform()` 과 MapPrimeNet `GetTransform()` 은 둘 다 transform 없을 때 `IDENTITY` 반환 — **transform 을 임의로 주입하는 곳은 양쪽 모두 없음.** 차이는 오직 box center 의 X 반전 유무.
+행렬을 **만들고 합성하는 코드는 전부 이 관례로 일관**되어 있었다. 문제는 관례가 어긋난 **입구와 출구** 두 곳이었다.
 
 ---
 
-## 수정안
+## 근본 원인 — 컬링 경로의 행렬 관례 불일치 2건
 
-대상: `D:\work\MapPrimeNetV2\src\A4L.Mapprime3DNet\IO\B3DM\B3dmTile.cs`
-메서드: `CreateBoundingVolume(Schema.BoundingVolume, MatrixTransform)` 의 `Box.Count == 12` 분기.
+### 원인 ① (입구): `GetTransform`이 tileset transform을 전치(transpose) 로드
 
-`LEFT_H` 정의 시에만 box center / halfAxes 의 X 부호를 반전한다 (Unity 와 일치).
+`B3dmTilesetSchemaExtensions.GetTransform` — 3D Tiles 스펙의 `transform`은 column-major(열-벡터 관례)
+배열로 `T[12..14]`가 translation. 기존 코드는 이를 "수학적으로 같은 배치"로 옮기느라 `T[12]`를
+Row0-Col3(=`[3]`)에 넣었다.
 
-```csharp
-if (boundingVolume.Box.Count == 12)
-{
-    var box = boundingVolume.Box;
-    Vector3d center    = new Vector3d(box[0], box[1], box[2]);
-    Vector3d halfAxesX = new Vector3d(box[3], box[4], box[5]);
-    Vector3d halfAxesY = new Vector3d(box[6], box[7], box[8]);
-    Vector3d halfAxesZ = new Vector3d(box[9], box[10], box[11]);
+이 엔진에서는 **flat 배열 순차 복사가 정답**이다: 저장 순서 전치(column-major→row-major)와
+관례 전치(열-벡터→행-벡터)가 서로 상쇄되기 때문. 전치 로드의 결과, 타일 transform의 ECEF
+translation이 열4(`[3],[7],[11]`)에 들어앉았고, 행4(−WO)와 열4(ECEF)가 공존하는 오염된 행렬이
+곱셈 교차항을 만들며 center가 8×10¹⁵까지 폭발했다.
 
-#if LEFT_H
-    // ECEF(오른손) → 왼손 프레임 정렬. UpdateWorldOriginLeft 가 X 반전 프레임에서
-    // worldOrigin/transform 을 만들므로, box center 도 같은 프레임으로 맞춰야
-    // computedTransform 의 -worldOrigin 이 상쇄되어 원점-상대 좌표가 된다.
-    center.X    *= -1;
-    halfAxesX.X *= -1;
-    halfAxesY.X *= -1;
-    halfAxesZ.X *= -1;
-#endif
-
-    var result = new TileOrientedBoundingBox(center, halfAxesX, halfAxesY, halfAxesZ);
-    result.Transform(transform.Matrix);
-    return result;
-}
+**결정적 로그 증거** (`[XFORM]` 검증 로그):
+```
+row4T=(0.1, 19642.1, -6371665.0)          ← 정상 자리 (−WO성 translation)
+col4=(-3150897.0, 4299833.5, 3490477.8)   ← 0이어야 할 자리에 협재 절대 ECEF!
 ```
 
-### 분기별 적용 규칙
+### 원인 ② (출구): `TileOrientedBoundingBox.Transform`이 행렬을 반대 방향으로 적용
 
-| 경로 | X 반전 |
-|------|--------|
-| `LEFT_H` (`UpdateWorldOriginLeft`) | **적용** — transform 이 X 반전 프레임 |
-| Right (`UpdateWorldOriginRight`) | **미적용** — transform 이 X 반전 안 함 |
+`B3dmTileBoundingVolume.cs` — `PostMultiply`(=`M·v`, 열-벡터 방향)를 사용.
+translation을 `[3],[7],[11]`(항상 0)에서 읽어 **−worldOrigin 차감이 통째로 소실**되고, 회전은
+전치(역회전)로 적용됐다. Left/Right 경로가 **같은 증상**을 보인 이유(둘 다 이 함수를 공유).
+바로 아래 `TileBoundingSphere.Transform`은 `MultiplyPoint`(올바름)를 쓰고 있었다 — 이 대비가
+이 라이브러리의 의도된 사용법을 보여주는 방증이었다.
 
-> Right 경로를 쓰는 빌드라면 이 수정으로 오히려 프레임이 어긋날 수 있으므로 반드시 `#if LEFT_H` 로 감쌀 것.
+### 원인 ③ (①의 워크어라운드 잔재): root transform 이중 주입
+
+`CustomMultiTilesetBehaviour`가 `opts.Translation/Rotation = rootTransform...`으로 스키마 root
+transform을 옵션에 복사하고, `B3dmTile.UpdateWorldOriginRight`가 `transform.Position + opts.Translation`으로
+또 더하는 구조. ① 버그 동안에는 `GetPosition()`이 0을 반환해(전치 로드 탓) 조용했지만 — 그래서
+생긴 워크어라운드로 추정 — ①을 고치면 ECEF가 이중 합산된다.
+
+### 왜 렌더링(메시)은 정상이었나
+
+콘텐츠 배치는 별도 경로다: `computedTransform` **분해값**(Position/Rotation)을 콘텐츠 루트
+오브젝트에 넣고(B3dmTile Process), GLB 노드/버텍스는 로컬 좌표로 씬그래프에서 합성된다.
+이 경로와 sphere 컬링그룹 경로(`Rot·(c − InvRot·WO)`, 쿼터니언 연산만 사용)는 `Matrix4d`
+소비 지점(OBB Transform)을 거치지 않아 무사했다.
 
 ---
 
-## 검증 절차
+## 적용된 수정 (전부 컬링 경로, 렌더 경로 무변경)
 
-1. 두 어셈블리(`A4L.Mapprime3DNet`, `A4L.MP3DCore`) `DefineConstants` 에 `LEFT_H` 정의 후 전체 리빌드.
-2. 협재해변 `tileset.json` 로드.
-3. `CreateBoundingVolume` 직후 `BoundingVolume.Center` 확인:
-   - 기대: `(-27908, ...)` 수준의 **작은 원점-상대 값**.
-4. `DetermineFrustumSet(root)` → `isInclude == true` 확인.
-5. 타일 요청/렌더 진행되어 화면에 모델 표시 확인.
+| # | 파일 | 수정 |
+|---|------|------|
+| ① | `B3dmTilesetSchemaExtensions.cs` `GetTransform` | 전치 로드 → **flat 배열 순차 복사**. `(float)` 캐스트 제거(ECEF ~3×10⁶은 float에서 미터급 오차) |
+| ② | `B3dmTileBoundingVolume.cs` `TileOrientedBoundingBox.Transform` | `PostMultiply`/`PostMultiply3X3` → **`PreMultiply`/`PreMultiply3X3`** (center는 translation 포함 4×4, HalfAxes는 회전만 3×3) |
+| ③ | `CustomMultiTilesetBehaviour.cs` | `opts.Translation/Rotation` 자동 주입 **제거** (기본값 Zero/IDENTITY, 사용자 오프셋 용도로만) |
 
-검증 기준값(정상): Unity OBB Center `(-27908, -15, 545)`.
+수정 후 검증 수치 (같은 타일 기준):
+```
+타일 OBB center           = (199.3, 168.9, 25.9)     ← 행렬 경로
+메시 AABB + 루트 변환 합   = (202.8, 154.2, 25.9)     ← 분해 경로 (Z 정확 일치)
+합성 회전(rotAxisAngle)    ≈ identity                 ← 블록 ENU 회전 ∘ WorldRotation 상쇄, 기대값
+```
+행렬 경로와 쿼터니언/분해 경로가 일치 → `DetermineFrustumSet` include → 타일 스트리밍/렌더 정상.
+
+---
+
+## 검증 방법 (재발 시 재사용)
+
+`UpdateWorldOriginRight`의 BoundingVolume 생성 직후 임시 로그 3종이 결정타였다:
+
+1. **`col4` 검사** — `computedTransform`의 `[3],[7],[11]`은 **(0,0,0)이어야 정상**. 값이 있으면
+   전치/열-벡터 행렬이 체인에 유입된 것 (원인 ①을 이걸로 잡음).
+2. **`row4T` 검사** — `[12],[13],[14]`에 −WO성 큰 값이 살아 있는지 (translation 생존 확인).
+3. **경로 대조** — 행렬 경로 결과(OBB center) vs 쿼터니언 경로 기대값(sphere `realCenter` 식)
+   vs 콘텐츠 분해 경로(메시 AABB + 루트 변환). 세 경로의 일치가 최종 판정 기준.
+
+교훈: **증상이 보이는 계산부(UpdateWorldOrigin)가 아니라, 행렬의 입구(로드 관례)와 출구(적용 관례)의
+일치부터 검증할 것.** 계산부 자체는 처음부터 올바랐다.
+
+---
+
+## 부수 결과물: 타일 BoundingVolume 시각화
+
+- `B3dmTile.DebugDrawBoundingVolume()` — BoundingVolume 생성 직후 OBB의 축정렬 포락 AABB를
+  `DebugHelper.UpdateBoundingBox(SID, bb)`로 그림. SID 키 기반이라 재계산 시 중복 없이 갱신.
+  `B3dmTile.DebugDrawBounds = false`로 끌 수 있음.
+- **주의(과거 함정)**: `SceneObject.BoundingBox`(메시 AABB)는 부모 변환이 빠진 **로컬 프레임**이라
+  DebugHelper(월드 프레임)에 그대로 그리면 어긋난 위치에 그려진다. 실제로 이것 때문에
+  "박스와 모델이 다른 위치" 오인 소동이 있었음 — 박스 시각화는 반드시 씬 프레임인
+  `tile.BoundingVolume`을 사용할 것.
+
+---
+
+## 남은 항목 (이번 증상과 무관, 추후)
+
+| 항목 | 위치 | 조건 |
+|------|------|------|
+| RTC_CENTER 없는 b3dm의 `tile.transform` 기반 콘텐츠 배치 | B3dmTile.cs TODO 주석 | 해당 데이터 로드 시 |
+| Region 분기 — `Transform()` 미적용 + 프레임 혼합 | `B3dmTile.CreateBoundingVolume` Region 경로 | region 기반 tileset 로드 시 |
+| `MatrixTransform.SetMatrix`의 Scale 소실 (분해 시 `Scale=null` 고정) | MatrixTransform.cs | transform에 scale 있는 tileset 로드 시 |
+| `GetWorldInvRotation()` float 반환 → ~0.5m 정밀도 손실 | Coordinates.cs | 정밀도 요구 시 double 버전 |
+| `UpdateWorldOriginLeft` 포팅 불일치 (worldOrigin 차감 대상, 90°X 주입 위치, `GetRootTransform` 미러 스케일 부재) | B3dmTile.cs / B3dmTileset.cs | LEFT_H 빌드 재사용 시 |
+| 타일 언로드 시 디버그 박스 제거 미구현 | B3dmTile.DebugDrawBoundingVolume | 시각화 상시 사용 시 |
 
 ---
 
 ## 비고
 
-- 본 문서는 분석 결과이며, 실제 수정은 MapPrimeNetV2 측 코드 변경을 수반한다.
-- 좌표 프레임 전체 흐름은 [b3dm-worldorigin-collaboration.svg](b3dm-worldorigin-collaboration.svg) 참고.
-- `SetOrigin`(WorldContext.cs:81) 은 NeoWorldDemo `BaseLocationManager.SetOrigin` 과 동일 — 원점 설정 자체는 정상.
+- 좌표 프레임 흐름 다이어그램: [b3dm-worldorigin-collaboration.svg](b3dm-worldorigin-collaboration.svg) (초기 분석 기준 — 본 문서의 결론 미반영)
+- 검증 완료된 정상 경로: `SetOrigin`/geodetic→ECEF/`ToWorld`·`ToLocal`, sphere 컬링그룹 경로, 콘텐츠 분해 경로, `GetQuaternion`↔`Rotate(quat)` 상호 일관성.
+- 참고 좌표: 협재 ECEF `(-3151036, 4299528, 3490554)` = 33.394127°N, 126.236928°E, h≈33m.

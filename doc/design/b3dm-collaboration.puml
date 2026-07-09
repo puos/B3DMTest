@@ -1,0 +1,93 @@
+@startuml b3dm_collaboration
+title B3DM 로딩 협력 다이어그램 — 요청 파이프라인 + World Origin 좌표 변환
+
+skinparam componentStyle rectangle
+skinparam defaultFontSize 12
+skinparam wrapWidth 240
+skinparam rectangle {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam arrowColor Black
+
+' ================= 진입 / 초기화 객체 =================
+rectangle "Viewer3D\n진입점" as V3D
+rectangle "B3dmDataSource\nIO.DataSource" as DS
+rectangle "WorldGlobe\n«Singleton»" as WG
+rectangle "CustomMultiTilesetBehaviour\nIO.B3DM" as CMB
+rectangle "B3dmTileset\nIO.B3DM" as BTS
+rectangle "B3DMLoader\n+ WebRequestLoader" as LDR
+
+' ================= 요청 파이프라인 =================
+package "요청 파이프라인" {
+    rectangle "AbstractTilesetBehaviour\nProcessTileset()" as ATB
+    rectangle "RequestManager\n다운로드 발행" as RM
+}
+
+' ================= 순회 / 콘텐츠 빌드 =================
+rectangle "B3dmTilesetTraversal\nfrustum / SSE 판정" as TRAV
+rectangle "B3dmTile\nIO.B3DM" as TILE
+rectangle "B3dmTileContent\nIO.B3DM" as TC
+rectangle "B3dmObject\nIO.B3DM" as OBJ
+rectangle "B3dmObjectManager\n«Singleton»" as OM
+
+' ================= Init (초록) =================
+V3D -[#1a6a1a]-> DS  : 1: StartTile(url)
+V3D -[#1a6a1a]-> WG  : 2: Initialize(view, lat, lon)
+DS  -[#1a6a1a]-> CMB : 3: Initialize()
+WG  -[#1a6a1a]-> CMB : 4: owns
+
+' ================= Load (빨강) =================
+CMB -[#8B0000]-> BTS : 5: AddTileset() / InitializeAsync()
+BTS -[#8B0000]-> LDR : 6: LoadTilesetJson()
+
+' ================= Update loop (파랑) =================
+CMB -[#1a1a8a]-> CMB  : 7: OnUpdate() 매 프레임 ↻
+CMB -[#1a1a8a]-> ATB  : 8: ProcessTileset()
+ATB -[#1a1a8a]-> BTS  : 9: lateUpdate → Update()
+BTS -[#1a1a8a]-> TRAV : 10: Traversal.Run()
+TRAV -[#1a1a8a]-> TILE : 11: RequestTile()
+TRAV -[#1a1a8a]-> TILE : 12: ToggleTiles()
+ATB -[#8B0000]-> RM   : 13: RequestManager.Process()
+RM  -[#8B0000]-> TILE : 14: RequestContentAsync()
+TILE -[#8B0000]-> LDR : 15: LoadStream(b3dm) → GLB
+TILE -[#1a1a8a]-> TC  : 16: Process() / SetActive()
+TC  -[#1a1a8a]-> OBJ  : 17: BuildGeometry()
+OBJ -[#1a1a8a]-> OM   : 18: Instantiate()
+
+' ================= World Origin 좌표 변환 밴드 =================
+package "World Origin 좌표 변환 (ECEF → 원점-상대)" {
+    rectangle "Coordinates / worldContext\nWorldOrigin 저장" as COORD
+    rectangle "ViewPort.Camera\nLookAt = 원점-상대(≈0)" as CAM
+    rectangle "B3dmTile.UpdateWorldOriginRight\npos3d = ToGeocentric(pos) − worldOrigin" as UWO
+    rectangle "CreateBoundingVolume\nOBB.Transform(computedTransform)" as CBV
+}
+
+TILE -[#1a1a8a]-> UWO   : W: tile 생성 시 UpdateWorldOrigin 호출
+WG  -[#1a6a1a]-> COORD  : W1: SetOrigin()
+WG  -[#1a6a1a]-> CAM    : W2: Camera.LookAt = convertCoordinateToVector(원점) ≈ 0
+CMB -[#1a1a8a]-> UWO    : W3: UpdateTile(root) ↻
+UWO -[#8B0000]-> COORD  : W4: GetWorldOrign()
+UWO -[#8B0000]-> BTS    : W5: GetRootTransform() = worldRot
+UWO -[#1a1a8a]-> CBV    : W6: OBB.Transform(computedTransform)
+
+note bottom of CBV
+  ⚠ 현재 증상
+  ─────────────────────────────
+  정상(Unity): center (-27908, -15, 545)  ← 원점-상대
+  현재: center (2217719, 2304534, 5510878)
+        |·| ≈ 6.37e6 = 지구 반지름
+  → 회전만 적용·worldOrigin 차감이 OBB center 에 반영 안 됨
+  → IntersectPlanes = OUTSIDE → Traversal(10) isInclude=false
+  → 타일 요청·렌더 전체 중단
+    (카메라는 원점-상대, 타일은 절대좌표)
+end note
+
+legend right
+  |= 색 |= 단계 |
+  |<#1a6a1a> 초록 | 초기화 (Init) |
+  |<#8B0000> 빨강 | 로드 / 요청 (Load · Request) |
+  |<#1a1a8a> 파랑 | 업데이트 / 렌더 (Update) |
+endlegend
+
+@enduml

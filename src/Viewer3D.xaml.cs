@@ -72,22 +72,16 @@ public partial class Viewer3D : Window
         GlobalOption.BackgroundColor = new ColorF(0.06f, 0.10f, 0.20f, 1.0f);
         ViewController!.BackgroundColor.Set(GlobalOption.BackgroundColor);
 
-
-        Workspace.Instance.CommandUi.UpdateCameraDistance();
-        Workspace.Instance.CommandUi.UpdateMouseDistance();
-
-        ViewController.ViewingZoomMoveSpeedPerSecond = GlobalOption.MouseZoom / 50.0;
-
         ViewController.PolygonMode = PolygonModes.Fill;
         ViewController.SceneView.Renderer.ShadingMode = GlobalOption.ShadingMode;
         
 
-        //var cameraController = new CustomCameraController();
-        //cameraController.ZoomMinDistance = 1.0;
+        var cameraController = new CustomCameraController();
+        cameraController.ZoomMinDistance = 1.0;
 
-        //ViewController.InputHandlers.Remove(cameraController);
-        //ViewController.InputHandlers.Add(cameraController);
-        //ViewController.InputHandlers.SetViewingMode(cameraController);
+        ViewController.InputHandlers.Remove(cameraController);
+        ViewController.InputHandlers.Add(cameraController);
+        ViewController.InputHandlers.SetViewingMode(cameraController);
     }
 
     private void ConfigureNearFar()
@@ -130,7 +124,6 @@ public partial class Viewer3D : Window
             SceneView.SceneGroups.Clear();
             Workspace.Instance.DataSources.Clear();
 
-
             WorldGlobe.Instance.Initialize(SceneView.View, 33.398628, 126.243173, 0); // 협재 해수욕장
             _b3dmDataSource = new B3dmDataSource(WorldGlobe.Instance);
 
@@ -145,6 +138,10 @@ public partial class Viewer3D : Window
             SceneView.SceneGroups.Add(group);
 
             Workspace.Instance.CommandUi.RefreshSceneGroup();
+
+            SceneView.View.Camera.LookAt = new Vector3d(0, 0, 0);
+            SceneView.View.Camera.Quat = Quaterniond.IDENTITY;
+            SceneView.View.Camera.Distance = 100;
 
 
             txtStatus.Text = $"로드 완료: {urlPath}";

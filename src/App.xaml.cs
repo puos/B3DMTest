@@ -20,6 +20,13 @@ public partial class App : Application
         SslBypass.Apply();
 
         var viewer = new Viewer3D();
+        
+        //viewer.LoadB3dmUrl("https://211.178.39.228:22480/terra_b3dms_HyeopjaeBeach_prev/tileset.json");
+        //viewer.GlobeSetPosition(33.398628, 126.243173);
+
+        viewer.LoadB3dmUrl("https://211.178.39.228:22480/terra_b3dms_test/4/tileset.json");
+        viewer.GlobeSetPosition(37.40697, 126.63336);
+
         viewer.Show();
     }
 }

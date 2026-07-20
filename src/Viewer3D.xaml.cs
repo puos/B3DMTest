@@ -26,6 +26,12 @@ public partial class Viewer3D : Window
     private B3dmDataSource? _b3dmDataSource;
     private bool _pendingZoomFit;
 
+    private string targetUrl = "https://211.178.39.228:22480/terra_b3dms_HyeopjaeBeach_prev/tileset.json"; 
+    
+    private double targetLatitude = 33.398628;
+    private double targetLongitude = 126.243173;
+
+
     public Viewer3D()
     {
         InitializeComponent();
@@ -95,43 +101,21 @@ public partial class Viewer3D : Window
         GlobalOption.Far = 10000;
     }
 
-   
-    private void btnLoad_Click(object sender, RoutedEventArgs e)
-    {
-        var url = txtUrl.Text.Trim();
-        if (string.IsNullOrEmpty(url)) return;
-        LoadB3DM(url);
-
-
-    }
-
-    private void txtUrl_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-            LoadB3DM(txtUrl.Text.Trim());
-    }
-
-    private void LoadB3DM(string urlPath)
+    private void LoadB3DM()
     {
         try
         {
-            //txtStatus.Text = $"로딩 중... {System.IO.Path.GetFileName(filePath)}";
-
-            SceneView!.NearFarUpdater.FarUpdateEnable = false;
+            SceneView.NearFarUpdater.FarUpdateEnable = false;
             SceneView.NearFarUpdater.NearUpdateEnable = false;
             SceneView.NearFarUpdater.TargetFar = 200000;
 
             SceneView.SceneGroups.Clear();
             Workspace.Instance.DataSources.Clear();
 
-            WorldGlobe.Instance.Initialize(SceneView.View, 33.398628, 126.243173, 0); // 협재 해수욕장
+            WorldGlobe.Instance.Initialize(SceneView.View, targetLatitude, targetLongitude , 0); 
             _b3dmDataSource = new B3dmDataSource(WorldGlobe.Instance);
 
-            //_fileServer?.Dispose();
-            //_fileServer = new LocalFileServer(System.IO.Path.GetDirectoryName(filePath)!);
-            //_fileServer.Start();
-            //var httpUrl = $"http://localhost:{_fileServer.Port}/{System.IO.Path.GetFileName(filePath)}";
-            _b3dmDataSource.StartTile(urlPath);   // async void — fire and forget
+            _b3dmDataSource.StartTile(targetUrl);
 
             Workspace.Instance.DataSources.Add(_b3dmDataSource);
             var group = _b3dmDataSource.CreateRenderableGroup();
@@ -144,7 +128,7 @@ public partial class Viewer3D : Window
             SceneView.View.Camera.Distance = 100;
 
 
-            txtStatus.Text = $"로드 완료: {urlPath}";
+            txtStatus.Text = $"로드 완료: {targetUrl}";
         }
         catch (Exception ex)
         {
@@ -176,7 +160,9 @@ public partial class Viewer3D : Window
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e) 
-    {        
+    {
+        txtUrl.Text = targetUrl;
+        LoadB3DM();
     }
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e) { }
@@ -209,5 +195,12 @@ public partial class Viewer3D : Window
         }
     }
 
-    
+    public void LoadB3dmUrl(string urlPath) => targetUrl = urlPath;
+
+    public void GlobeSetPosition(double latitude, double longitude)
+    {
+        targetLatitude = latitude;
+        targetLongitude = longitude;
+    }
+
 }
